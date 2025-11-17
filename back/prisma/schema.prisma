@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  name      String
+  password  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model Post {
+  id              Int              @id @default(autoincrement())
+  titulo          String
+  chamada         String           @db.Text
+  conteudo        String           @db.Text
+  imagens         Json             // Array de URLs das imagens no S3
+  urlAmigavel     String           @unique // Slug para URL amigável
+  status          PostStatus       @default(RASCUNHO)
+  destaque        Boolean          @default(false)
+  dataPublicacao  DateTime?        // Data de publicação
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  sites           PostSite[]
+  tags            PostTag[]
+
+  @@map("posts")
+  @@index([urlAmigavel])
+  @@index([status])
+  @@index([destaque])
+  @@index([dataPublicacao])
+}
+
+enum PostStatus {
+  RASCUNHO
+  PUBLICADO
+}
+
+model Site {
+  id        Int        @id @default(autoincrement())
+  nome      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  posts     PostSite[]
+
+  @@map("sites")
+}
+
+model PostSite {
+  id      Int  @id @default(autoincrement())
+  postId  Int
+  siteId  Int
+  post    Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  site    Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, siteId])
+  @@map("post_sites")
+}
+
+model Tag {
+  id        Int       @id @default(autoincrement())
+  nome      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  posts     PostTag[]
+
+  @@map("tags")
+}
+
+model PostTag {
+  id     Int  @id @default(autoincrement())
+  postId Int
+  tagId  Int
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, tagId])
+  @@map("post_tags")
+}
