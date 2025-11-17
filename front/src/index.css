@@ -12,7 +12,7 @@ All colors MUST be HSL.
     /*--foreground: 222.2 84% 4.9%*/; 
     --foreground: var(--oceanic);
     
-    --primary: 0 100% 45% /* hsl(0 100% 45%) */;
+    --primary: 204 57% 15% /* hsl(204 57% 15%) */;
     --primary-foreground: 210 40% 98% /* hsl(210 40% 98%) */;
 
     --secondary: 210 40% 96.1% /* hsl(210 40% 96.1%) */;
@@ -28,8 +28,7 @@ All colors MUST be HSL.
     /*--card-foreground: 222.2 84% 4.9% /* hsl(222.2 84% 4.9%) /* texto dos blocos de conteudo */;
     --card-foreground: var(--oceanic);
 
-    --popover: 0 0% 100% /* hsl(0 0% 100%) */;
-    /*--popover-foreground: 222.2 84% 4.9% /* hsl(222.2 84% 4.9%) */;    
+    --popover: 0 0% 100% /* hsl(0 0% 100%) */;    
     --popover-foreground: var(--oceanic);
 
     --muted: 210 40% 96.1% /* hsl(210 40% 96.1%) */;
@@ -50,13 +49,13 @@ All colors MUST be HSL.
     --radius: 0.5rem;
 
     /*--sidebar-background: 0 0% 98% /* hsl(0 0% 98%) */;
-    --sidebar-background: 0 100% 45% /* hsl(0 100% 45%) */;
+    --sidebar-background: 214 57% 15% /* hsl(214 57% 15%) */;
 
     /*--sidebar-foreground: 240 5.3% 26.1% /* hsl(240 5.3% 26.1%) */;
     --sidebar-foreground: 122 0% 100% /* hsl(122 0% 100%) /* texto dos itens da sidebar*/;    
 
     /*--sidebar-accent: 240 4.8% 95.9% /* hsl(240 4.8% 95.9%) */;
-    --sidebar-accent: 204 57% 15% /* hsl(204 57% 15%) /* hover no background dos itens da sidebar*/;
+    --sidebar-accent: 222.2 84% 4.9% /* hsl(204 57% 15%) /* hover no background dos itens da sidebar*/;
 
     /*--sidebar-accent-foreground: 240 5.9% 10% /* hsl(240 5.9% 10%) */;
     --sidebar-accent-foreground: 0 0% 100% /* hsl(0 0% 100%) /* hover no texto dos itens da sidebar*/;

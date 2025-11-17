@@ -16,7 +16,7 @@ import {
 
 import { FileText, Users, LogOut, LayoutDashboard, User, Tags, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import logo from '@/assets/logo-w.png';
+
 /*import { ThemeToggle } from '@/components/ui/theme-toggle';*/
 
 
@@ -59,8 +59,8 @@ export function AdminLayout() {
       <div className="min-h-screen flex w-full">
         <Sidebar>
           <SidebarContent>
-            <div className="p-4 bg-oceanic text-oceanic-foreground">
-              <img src={logo} alt="Logo" className="mt-4 mb-5 w-full max-w-52" />
+            <div className="p-4 bg-slate-900 text-oceanic-foreground">
+              <h1 className="text-2xl font-bold text-white text-center py-4">CMS News</h1>
             </div>
 
             <SidebarGroup>
