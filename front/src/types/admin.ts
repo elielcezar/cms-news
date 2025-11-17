@@ -6,6 +6,38 @@ export interface Tag {
   updatedAt: string;
 }
 
+// Pauta (Sugestão de Pauta gerada por IA)
+export interface Pauta {
+  id: number;
+  assunto: string;
+  resumo: string;
+  fontes: {
+    nome: string;
+    url: string;
+  }[];
+  siteId?: number;
+  site?: Site;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Fonte (Feed de notícias para IA)
+export interface Fonte {
+  id: number;
+  titulo: string;
+  url: string;
+  siteId: number;
+  site: Site;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FonteFormData {
+  titulo: string;
+  url: string;
+  siteId: number;
+}
+
 // Site
 export interface Site {
   id: number;

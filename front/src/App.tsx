@@ -14,6 +14,9 @@ import Sites from "./pages/admin/Sites";
 import SiteForm from "./pages/admin/SiteForm";
 import Tags from "./pages/admin/Tags";
 import TagForm from "./pages/admin/TagForm";
+import Pautas from "./pages/admin/Pautas";
+import Fontes from "./pages/admin/Fontes";
+import FonteForm from "./pages/admin/FonteForm";
 import Users from "./pages/admin/Users";
 import UserForm from "./pages/admin/UserForm";
 import Profile from "./pages/admin/Profile";
@@ -35,6 +38,10 @@ const App = () => (
                 <Route path="posts" element={<Posts />} />
                 <Route path="posts/novo" element={<PostForm />} />
                 <Route path="posts/:id/editar" element={<PostForm />} />
+                <Route path="pautas" element={<Pautas />} />
+                <Route path="fontes" element={<Fontes />} />
+                <Route path="fontes/novo" element={<FonteForm />} />
+                <Route path="fontes/:id/editar" element={<FonteForm />} />
                 <Route path="sites" element={<Sites />} />
                 <Route path="sites/novo" element={<SiteForm />} />
                 <Route path="sites/:id/editar" element={<SiteForm />} />

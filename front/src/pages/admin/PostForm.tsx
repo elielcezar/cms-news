@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { postsService } from '@/services/posts.service';
 import { sitesService } from '@/services/sites.service';
@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 export default function PostForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEdit = !!id;
@@ -89,6 +90,35 @@ export default function PostForm() {
       setSelectedTags(tagsIds);
     }
   }, [post, isEdit]);
+
+  // Preencher formulário com dados da pauta (se vier de conversão)
+  useEffect(() => {
+    const pautaData = location.state?.fromPauta;
+    if (pautaData && !isEdit) {
+      setFormData(prev => ({
+        ...prev,
+        titulo: pautaData.titulo || '',
+        chamada: pautaData.chamada || '',
+        conteudo: pautaData.conteudo || '',
+      }));
+      
+      // Auto-gerar slug do título
+      if (pautaData.titulo) {
+        const slug = generateSlug(pautaData.titulo);
+        setFormData(prev => ({ ...prev, urlAmigavel: slug }));
+      }
+
+      // Selecionar site se fornecido
+      if (pautaData.siteId) {
+        setSelectedSites([pautaData.siteId]);
+      }
+
+      toast({
+        title: 'Dados carregados da pauta',
+        description: 'O formulário foi preenchido com os dados da sugestão de pauta.',
+      });
+    }
+  }, [location.state, isEdit, toast]);
 
   // Mutation para criar
   const createMutation = useMutation({

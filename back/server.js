@@ -6,6 +6,8 @@ import postsRoutes from './routes/posts.js';
 import loginRoutes from './routes/login.js';
 import sitesRoutes from './routes/sites.js';
 import tagsRoutes from './routes/tags.js';
+import pautasRoutes from './routes/pautas.js';
+import fontesRoutes from './routes/fontes.js';
 import { errorHandler } from './utils/errors.js';
 
 // Carregar variáveis de ambiente do arquivo .env
@@ -45,7 +47,7 @@ app.use(cors({
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-api-key'],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
     maxAge: 86400 // 24 horas para cache de preflight
 }));
@@ -65,6 +67,8 @@ app.use('/api', usuariosRoutes);
 app.use('/api', postsRoutes);
 app.use('/api', sitesRoutes);
 app.use('/api', tagsRoutes);
+app.use('/api', pautasRoutes);
+app.use('/api', fontesRoutes);
 
 // Servir arquivos estáticos (se existirem uploads locais antigos)
 app.use('/uploads', express.static('uploads'));

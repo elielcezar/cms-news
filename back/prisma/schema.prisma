@@ -54,6 +54,8 @@ model Site {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   posts     PostSite[]
+  pautas    Pauta[]
+  fontes    Fonte[]
 
   @@map("sites")
 }
@@ -88,4 +90,33 @@ model PostTag {
 
   @@unique([postId, tagId])
   @@map("post_tags")
+}
+
+model Pauta {
+  id        Int      @id @default(autoincrement())
+  assunto   String
+  resumo    String   @db.Text
+  fontes    Json     // Array de {nome: string, url: string}
+  siteId    Int?
+  site      Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("pautas")
+  @@index([createdAt])
+  @@index([siteId])
+}
+
+model Fonte {
+  id        Int      @id @default(autoincrement())
+  titulo    String
+  url       String
+  siteId    Int
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("fontes")
+  @@index([siteId])
+  @@index([url])
 }
