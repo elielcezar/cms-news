@@ -1,0 +1,284 @@
+{
+  "name": "EDMNews",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://cms.ecwd.cloud/api/fontes/site/1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -352,
+        -16
+      ],
+      "id": "09316ec0-c173-4df6-b0ad-9b4885d04dfb",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "feJbdX9cMvgfZMGR",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Você é um editor de notícias especializado em música eletrônica.\n\nAnalise os seguintes conteúdos de sites de notícias e gere sugestões de pauta para os últimos 7 dias.\n\nCONTEÚDOS:\n{{ $json.data.map((item, i) => `\\n## Fonte ${i+1}: ${item.titulo}\\nURL: ${item.url}\\n\\n${item.conteudo}\\n\\n---\\n`).join('') }}\n\nINSTRUÇÕES:\n- Identifique notícias interessantes dos últimos 7 dias\n- Para cada sugestão de pauta, forneça:\n  - Assunto (título curto e chamativo)\n  - Resumo (2-3 frases explicando a notícia)\n  - Fontes (lista com nome e URL de onde veio a informação)\n\nFORMATO DE RESPOSTA (JSON):\n{\n  \"pautas\": [\n    {\n      \"assunto\": \"Grammy 2026: Skrillex concorre em 2 categorias\",\n      \"resumo\": \"Foram divulgados os indicados do Grammy 2026. Skrillex está presente em duas categorias de música eletrônica.\",\n      \"fontes\": [\n        {\"nome\": \"House Mag\", \"url\": \"https://housemag.com.br/...\"},\n        {\"nome\": \"Mixmag Brasil\", \"url\": \"https://mixmag.com.br/...\"}\n      ]\n    }\n  ]\n}\n\nIMPORTANTE: Retorne APENAS o JSON, sem texto adicional.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        592,
+        -16
+      ],
+      "id": "78b7a504-af6d-4cd0-b7e4-a505ee888180",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.item.json.fontes.map(f => ({\n  json: {\n    titulo: f.titulo,\n    url: f.url,   \n    jinaUrl: `https://r.jina.ai/${f.url}`\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -16
+      ],
+      "id": "a2f27858-6b2e-4a7c-b379-38cbc2c783d9",
+      "name": "Formata a URL com Jina"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -16
+      ],
+      "id": "abf20f28-c6e2-48c8-bd46-f1e242b65660",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        544,
+        192
+      ],
+      "id": "80a93f1c-0782-4bb5-9a3d-d6bc139d7ae3",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "MSFXfz4LdsMHyW9S",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cms.ecwd.cloud/api/pautas",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1136,
+        -16
+      ],
+      "id": "3f0d4270-ab7d-43a3-a554-4ddb65a70051",
+      "name": "HTTP Request2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "XS08L8ouaqrRoyEF",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega a resposta da IA\nconst aiResponse = $input.item.json.output;\n\n// Remove os marcadores de código markdown (```json e ```)\nlet jsonString = aiResponse\n  .replace(/```json\\n?/g, '')\n  .replace(/```\\n?/g, '')\n  .trim();\n\n// Parse do JSON\nlet resultado;\ntry {\n  resultado = JSON.parse(jsonString);\n} catch (error) {\n  console.error('Erro ao parsear JSON:', error);\n  console.log('String original:', jsonString);\n  throw new Error('Não foi possível parsear a resposta da IA');\n}\n\n// Extrai as pautas\nconst pautas = resultado.pautas || [];\n\nconsole.log(`📋 ${pautas.length} pautas encontradas`);\n\n// Retorna cada pauta como um item separado, já no formato para o HTTP Request\nreturn pautas.map(pauta => {\n  const requestBody = {\n    assunto: pauta.assunto,\n    resumo: pauta.resumo,\n    fontes: pauta.fontes,\n    siteId: 1\n  };\n\n  // Debug\n  console.log('📤 Preparando pauta:', requestBody.assunto);\n  console.log('🔢 Tipo de siteId:', typeof requestBody.siteId);\n  console.log('📋 Tipo de fontes:', Array.isArray(requestBody.fontes) ? 'Array' : typeof requestBody.fontes);\n\n  return {\n    json: {\n      body: requestBody\n    }\n  };\n});\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        -16
+      ],
+      "id": "5baa922b-dc75-4987-8a43-01478c29e7e9",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        -16
+      ],
+      "id": "ba0fffde-a410-4c5f-be96-456952866da6",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.jinaUrl }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        48,
+        -16
+      ],
+      "id": "5fec1779-3da9-4ec3-9913-ec1cf61e2965",
+      "name": "Busca o conteúdo das Paginas"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o item atual (que já tem titulo e url passados dos passos anteriores)\nconst item = $input.item.json;\n\n// O conteúdo está no campo \"data\" do HTTP Request\nlet conteudo = item.data || '';\n\n// Se não tem data, tenta outras alternativas\nif (!conteudo) {\n  conteudo = item.body || item.content || item.text || JSON.stringify(item);\n}\n\n// Debug\nconsole.log('Titulo:', item.titulo);\nconsole.log('URL:', item.url);\nconsole.log('Tamanho do conteúdo:', conteudo.length);\n\n// Retorna o item processado (SEM array wrapper para processar cada item individualmente)\nreturn {\n  json: {\n    titulo: item.titulo || 'Sem título',\n    url: item.url || 'Sem URL',\n    conteudo: conteudo.substring(0, 5000),\n    tamanhoTotal: conteudo.length\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -16
+      ],
+      "id": "c846b791-4c6f-45e6-a140-cde432e13b39",
+      "name": "Processa os Conteúdos"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Formata a URL com Jina",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formata a URL com Jina": {
+      "main": [
+        [
+          {
+            "node": "Busca o conteúdo das Paginas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca o conteúdo das Paginas": {
+      "main": [
+        [
+          {
+            "node": "Processa os Conteúdos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processa os Conteúdos": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "bdba32c7-ad4e-41ad-8273-5084e3a609d5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "55110b778948b706095654571ea1560fc31d8aad607c2efb5268271243268daf"
+  },
+  "id": "fu6KEn7PHV0ltlTk",
+  "tags": []
+}
