@@ -1,7 +1,7 @@
 // Configuração da API
 export const API_CONFIG = {
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3004/api',
-  timeout: 30000, // 30 segundos
+  timeout: 60000, // 60 segundos (necessário para geração de IA multilíngue)
   headers: {
     'Content-Type': 'application/json',
   },
