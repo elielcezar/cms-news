@@ -50,17 +50,27 @@ export interface Site {
 // Alias para compatibilidade
 export type Categoria = Site;
 
-// Post (antiga Property/Imovel)
+// Tradução de Post
+export interface PostTranslation {
+  id: number;
+  postId: number;
+  idioma: 'pt' | 'en' | 'es';
+  titulo: string;
+  chamada: string;
+  conteudo: string;
+  urlAmigavel: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Post (antiga Property/Imovel) - agora multilíngue
 export interface Post {
   id: number;
-  titulo: string;
-  chamada: string;        // Era descricaoCurta
-  conteudo: string;       // Era descricaoLonga
-  imagens: string[];      // Era fotos - URLs do S3
-  urlAmigavel: string;    // Slug para URL amigável
+  imagens: string[];      // URLs do S3
   status: 'RASCUNHO' | 'PUBLICADO';
   destaque: boolean;
   dataPublicacao: string | null;
+  idiomaDefault: string;  // Idioma padrão
   createdAt: string;
   updatedAt: string;
   sites?: {
@@ -71,6 +81,13 @@ export interface Post {
     id: number;
     tag: Tag;
   }[];
+  translations?: PostTranslation[];
+  // Campos de tradução no nível raiz (quando retornado pela API com ?lang)
+  titulo?: string;
+  chamada?: string;
+  conteudo?: string;
+  urlAmigavel?: string;
+  translationsAvailable?: string[];
 }
 
 // Para criar/editar post
@@ -86,6 +103,16 @@ export interface PostFormData {
   tags?: number[];        // Array de IDs de tags
   imagens?: File[];       // Arquivos para upload
   oldImages?: string[];   // URLs existentes
+  idioma?: 'pt' | 'en' | 'es';  // Para edição de tradução específica
+}
+
+// Para criar/editar tradução
+export interface TranslationFormData {
+  idioma: 'pt' | 'en' | 'es';
+  titulo: string;
+  chamada: string;
+  conteudo: string;
+  urlAmigavel: string;
 }
 
 // Usuário

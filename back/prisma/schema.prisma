@@ -23,24 +23,40 @@ model User {
 
 model Post {
   id              Int              @id @default(autoincrement())
-  titulo          String
-  chamada         String           @db.Text
-  conteudo        String           @db.Text
   imagens         Json             // Array de URLs das imagens no S3
-  urlAmigavel     String           @unique // Slug para URL amigável
   status          PostStatus       @default(RASCUNHO)
   destaque        Boolean          @default(false)
   dataPublicacao  DateTime?        // Data de publicação
+  idiomaDefault   String           @default("pt") // Idioma padrão do post
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   sites           PostSite[]
   tags            PostTag[]
+  translations    PostTranslation[]
 
   @@map("posts")
-  @@index([urlAmigavel])
   @@index([status])
   @@index([destaque])
   @@index([dataPublicacao])
+}
+
+model PostTranslation {
+  id          Int      @id @default(autoincrement())
+  postId      Int
+  idioma      String   // "pt", "en", "es"
+  titulo      String
+  chamada     String   @db.Text
+  conteudo    String   @db.Text
+  urlAmigavel String   @unique // Slug com prefixo de idioma: /pt/slug, /en/slug, /es/slug
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, idioma])
+  @@map("post_translations")
+  @@index([postId])
+  @@index([idioma])
+  @@index([urlAmigavel])
 }
 
 enum PostStatus {

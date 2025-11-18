@@ -40,9 +40,10 @@ export async function fetchContentWithJina(url) {
  * @param {string} params.assunto - Assunto da pauta
  * @param {string} params.resumo - Resumo da pauta
  * @param {Array} params.conteudos - Array com conteúdos das fontes
- * @returns {Promise<Object>} - {titulo, chamada, conteudo}
+ * @param {boolean} params.multilingual - Se true, gera em PT, EN e ES
+ * @returns {Promise<Object>} - Se multilingual: {pt: {...}, en: {...}, es: {...}}, senão: {titulo, chamada, conteudo}
  */
-export async function generateNewsWithAI({ assunto, resumo, conteudos }) {
+export async function generateNewsWithAI({ assunto, resumo, conteudos, multilingual = false }) {
   // Verifica se tem OpenAI configurada
   const apiKey = process.env.OPENAI_API_KEY;
   
@@ -50,7 +51,56 @@ export async function generateNewsWithAI({ assunto, resumo, conteudos }) {
     throw new Error('OPENAI_API_KEY não configurada no .env');
   }
 
-  const prompt = `Você é um redator profissional de notícias sobre música eletrônica.
+  let prompt;
+
+  if (multilingual) {
+    // Prompt para gerar 3 idiomas de uma vez
+    prompt = `Você é um redator profissional de notícias sobre música eletrônica, fluente em Português, Inglês e Espanhol.
+
+PAUTA:
+Assunto: ${assunto}
+Resumo: ${resumo}
+
+CONTEÚDO DAS FONTES:
+${conteudos.map((c, i) => `\n--- Fonte ${i + 1} ---\n${c.substring(0, 2500)}\n`).join('\n')}
+
+TAREFA:
+Escreva uma notícia completa e original EM 3 IDIOMAS (Português, Inglês e Espanhol) baseada nesta pauta.
+
+IMPORTANTE:
+- NÃO faça apenas tradução literal - adapte culturalmente cada versão
+- Use nomes e expressões naturais em cada idioma
+- Mantenha o mesmo tom profissional e informativo
+- Cada versão deve ter 300-500 palavras
+
+FORMATO DE CADA NOTÍCIA:
+- Título chamativo e profissional
+- Chamada (subtítulo) de 1-2 frases
+- Conteúdo completo em HTML (use tags <p>, <h2>, <strong>, <em>, etc.)
+
+FORMATO DE RESPOSTA (JSON):
+{
+  "pt": {
+    "titulo": "Título em português",
+    "chamada": "Subtítulo em português",
+    "conteudo": "<p>Conteúdo completo em HTML...</p>"
+  },
+  "en": {
+    "titulo": "Title in English",
+    "chamada": "Subtitle in English",
+    "conteudo": "<p>Full content in HTML...</p>"
+  },
+  "es": {
+    "titulo": "Título en español",
+    "chamada": "Subtítulo en español",
+    "conteudo": "<p>Contenido completo en HTML...</p>"
+  }
+}
+
+Retorne APENAS o JSON, sem texto adicional.`;
+  } else {
+    // Prompt original (apenas PT)
+    prompt = `Você é um redator profissional de notícias sobre música eletrônica.
 
 PAUTA:
 Assunto: ${assunto}
@@ -75,6 +125,7 @@ FORMATO DE RESPOSTA (JSON):
 }
 
 Retorne APENAS o JSON, sem texto adicional.`;
+  }
 
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
@@ -82,7 +133,9 @@ Retorne APENAS o JSON, sem texto adicional.`;
       messages: [
         {
           role: 'system',
-          content: 'Você é um redator profissional de notícias. Sempre responda em JSON válido.'
+          content: multilingual 
+            ? 'Você é um redator profissional de notícias multilíngue. Sempre responda em JSON válido com as 3 versões (pt, en, es).'
+            : 'Você é um redator profissional de notícias. Sempre responda em JSON válido.'
         },
         {
           role: 'user',
@@ -90,7 +143,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
         }
       ],
       temperature: 0.7,
-      max_tokens: 2000
+      max_tokens: multilingual ? 4000 : 2000
     });
 
     const options = {
@@ -104,7 +157,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
         'Content-Length': Buffer.byteLength(postData)
       }
     };
-
+1. 
     console.log('🤖 Chamando OpenAI para gerar notícia...');
 
     const req = https.request(options, (res) => {
@@ -133,7 +186,16 @@ Retorne APENAS o JSON, sem texto adicional.`;
 
           const newsData = JSON.parse(jsonString);
 
-          console.log('✅ Notícia gerada com sucesso!');
+          if (multilingual) {
+            // Validar formato multilíngue
+            if (!newsData.pt || !newsData.en || !newsData.es) {
+              throw new Error('Resposta da IA não contém os 3 idiomas (pt, en, es)');
+            }
+            console.log('✅ Notícias geradas em 3 idiomas com sucesso!');
+          } else {
+            console.log('✅ Notícia gerada com sucesso!');
+          }
+          
           resolve(newsData);
         } catch (error) {
           console.error('❌ Erro ao parsear resposta da IA:', error);

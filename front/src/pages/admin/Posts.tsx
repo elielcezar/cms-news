@@ -22,15 +22,23 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Plus, Pencil, Trash2, ArrowUpDown, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowUpDown, Loader2, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type SortColumn = 'titulo' | 'dataPublicacao' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 export default function Posts() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentLang, setCurrentLang] = useState<string>('pt');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<SortColumn>('dataPublicacao');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -40,10 +48,10 @@ export default function Posts() {
 
   const itemsPerPage = 10;
 
-  // Buscar posts
+  // Buscar posts (com idioma selecionado)
   const { data: posts, isLoading } = useQuery({
-    queryKey: ['posts'],
-    queryFn: () => postsService.getAll(),
+    queryKey: ['posts', currentLang],
+    queryFn: () => postsService.getAll({ lang: currentLang }),
   });
 
   // Mutation para deletar
@@ -141,15 +149,30 @@ export default function Posts() {
 
       <Card className="mb-4">
         <CardContent className="pt-6">
-          <Input
-            placeholder="Buscar por título, chamada ou URL..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="max-w-md"
-          />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Input
+              placeholder="Buscar por título, chamada ou URL..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="max-w-md"
+            />
+            <div className="flex items-center gap-2">
+              <Globe className="h-4 w-4 text-muted-foreground" />
+              <Select value={currentLang} onValueChange={(val) => setCurrentLang(val)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pt">🇧🇷 Português</SelectItem>
+                  <SelectItem value="en">🇺🇸 English</SelectItem>
+                  <SelectItem value="es">🇪🇸 Español</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

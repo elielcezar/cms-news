@@ -200,43 +200,58 @@ router.post('/pautas/:id/converter-em-post', authenticateToken, async (req, res,
 
         console.log(`✅ ${conteudosValidos.length} conteúdos obtidos com sucesso`);
 
-        // Gerar notícia com IA
-        console.log('🤖 Gerando notícia com IA...');
+        // Gerar notícia com IA em 3 idiomas
+        console.log('🤖 Gerando notícias em 3 idiomas com IA...');
         const newsData = await generateNewsWithAI({
             assunto: pauta.assunto,
             resumo: pauta.resumo,
-            conteudos: conteudosValidos
+            conteudos: conteudosValidos,
+            multilingual: true
         });
 
-        console.log(`✅ Notícia gerada: "${newsData.titulo}"`);
+        console.log(`✅ Notícias geradas em PT, EN e ES`);
 
-        // Gerar slug único
-        let slug = generateSlug(newsData.titulo);
-        let slugFinal = slug;
-        let contador = 1;
+        // Gerar slugs únicos para cada idioma
+        const slugs = {};
+        const idiomas = ['pt', 'en', 'es'];
+        
+        for (const idioma of idiomas) {
+            let baseSlug = generateSlug(newsData[idioma].titulo);
+            let slugFinal = `${idioma}/${baseSlug}`;
+            let contador = 1;
 
-        // Verificar se slug já existe
-        while (await prisma.post.findUnique({ where: { urlAmigavel: slugFinal } })) {
-            slugFinal = `${slug}-${contador}`;
-            contador++;
+            // Verificar se slug já existe na tabela de traduções
+            while (await prisma.postTranslation.findUnique({ where: { urlAmigavel: slugFinal } })) {
+                slugFinal = `${idioma}/${baseSlug}-${contador}`;
+                contador++;
+            }
+
+            slugs[idioma] = slugFinal;
+            console.log(`   📝 Slug ${idioma.toUpperCase()}: ${slugFinal}`);
         }
 
-        // Criar post em rascunho
+        // Criar post base (sem campos de conteúdo)
         const post = await prisma.post.create({
             data: {
-                titulo: newsData.titulo,
-                chamada: newsData.chamada,
-                conteudo: newsData.conteudo,
-                urlAmigavel: slugFinal,
                 status: 'RASCUNHO',
                 destaque: false,
                 imagens: [],
-                dataPublicacao: new Date(), // Data de criação do post
+                idiomaDefault: 'pt',
+                dataPublicacao: new Date(),
                 sites: pauta.siteId ? {
                     create: {
                         siteId: pauta.siteId
                     }
-                } : undefined
+                } : undefined,
+                translations: {
+                    create: idiomas.map(idioma => ({
+                        idioma: idioma,
+                        titulo: newsData[idioma].titulo,
+                        chamada: newsData[idioma].chamada,
+                        conteudo: newsData[idioma].conteudo,
+                        urlAmigavel: slugs[idioma]
+                    }))
+                }
             },
             include: {
                 sites: {
@@ -248,14 +263,16 @@ router.post('/pautas/:id/converter-em-post', authenticateToken, async (req, res,
                     include: {
                         tag: true
                     }
-                }
+                },
+                translations: true
             }
         });
 
         console.log(`✅ Post criado com sucesso! ID: ${post.id}`);
+        console.log(`   🌍 Traduções: ${post.translations.length} idiomas`);
 
         res.status(201).json({
-            message: 'Post criado com sucesso',
+            message: 'Post criado em 3 idiomas (PT, EN, ES) com sucesso',
             postId: post.id,
             post: post
         });

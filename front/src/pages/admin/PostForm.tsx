@@ -17,8 +17,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, X, Upload } from 'lucide-react';
+import { ArrowLeft, Loader2, X, Upload, Globe } from 'lucide-react';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -30,6 +32,7 @@ export default function PostForm() {
   const queryClient = useQueryClient();
   const isEdit = !!id;
 
+  const [currentLang, setCurrentLang] = useState<'pt' | 'en' | 'es'>('pt');
   const [formData, setFormData] = useState<PostFormData>({
     titulo: '',
     chamada: '',
@@ -47,6 +50,7 @@ export default function PostForm() {
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [selectedSites, setSelectedSites] = useState<number[]>([]);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>(['pt']);
 
   // Buscar sites
   const { data: sites } = useQuery({
@@ -60,17 +64,28 @@ export default function PostForm() {
     queryFn: () => tagsService.getAll(),
   });
 
-  // Buscar post se for edição
-  const { data: post } = useQuery({
-    queryKey: ['post', id],
-    queryFn: () => postsService.getById(Number(id)),
+  // Buscar post se for edição (com idioma atual)
+  const { data: post, refetch: refetchPost } = useQuery({
+    queryKey: ['post', id, currentLang],
+    queryFn: () => postsService.getById(Number(id), currentLang),
     enabled: isEdit && !!id,
   });
+
+  // Recarregar tradução ao trocar idioma
+  useEffect(() => {
+    if (isEdit && id) {
+      refetchPost();
+    }
+  }, [currentLang, isEdit, id, refetchPost]);
 
   useEffect(() => {
     if (post && isEdit) {
       const sitesIds = post.sites?.map(s => s.site.id) || [];
       const tagsIds = post.tags?.map(t => t.tag.id) || [];
+      
+      // Idiomas disponíveis (traduções existentes)
+      const langs = post.translations?.map(t => t.idioma) || ['pt'];
+      setAvailableLanguages(langs);
       
       // Converter data para formato datetime-local (YYYY-MM-DDTHH:mm)
       let dataFormatada = '';
@@ -80,10 +95,10 @@ export default function PostForm() {
       }
       
       setFormData({
-        titulo: post.titulo,
-        chamada: post.chamada,
-        conteudo: post.conteudo,
-        urlAmigavel: post.urlAmigavel,
+        titulo: post.titulo || '',
+        chamada: post.chamada || '',
+        conteudo: post.conteudo || '',
+        urlAmigavel: post.urlAmigavel || '',
         status: post.status,
         destaque: post.destaque,
         dataPublicacao: dataFormatada,
@@ -150,15 +165,16 @@ export default function PostForm() {
   // Mutation para atualizar
   const updateMutation = useMutation({
     mutationFn: (data: Partial<PostFormData>) => 
-      postsService.update(Number(id), data),
+      postsService.update(Number(id), data, currentLang),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['post', id] });
       toast({
         title: 'Post atualizado',
-        description: 'O post foi atualizado com sucesso.',
+        description: `Tradução em ${currentLang.toUpperCase()} atualizada com sucesso.`,
       });
-      navigate('/admin/posts');
+      // Não redirecionar - permite editar outros idiomas
+      refetchPost();
     },
     onError: (error: Error) => {
       toast({
@@ -320,7 +336,7 @@ export default function PostForm() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/admin/posts')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight">
             {isEdit ? 'Editar Post' : 'Novo Post'}
           </h1>
@@ -330,10 +346,41 @@ export default function PostForm() {
         </div>
       </div>
 
+      {/* Seletor de Idioma */}
+      {isEdit && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Globe className="h-5 w-5 text-muted-foreground" />
+              <Label className="text-base font-semibold">Idioma da Edição:</Label>
+              <Tabs value={currentLang} onValueChange={(val) => setCurrentLang(val as 'pt' | 'en' | 'es')}>
+                <TabsList>
+                  <TabsTrigger value="pt" className="gap-2">
+                    🇧🇷 PT
+                    {availableLanguages.includes('pt') && <Badge variant="secondary" className="text-xs">✓</Badge>}
+                  </TabsTrigger>
+                  <TabsTrigger value="en" className="gap-2">
+                    🇺🇸 EN
+                    {availableLanguages.includes('en') && <Badge variant="secondary" className="text-xs">✓</Badge>}
+                  </TabsTrigger>
+                  <TabsTrigger value="es" className="gap-2">
+                    🇪🇸 ES
+                    {availableLanguages.includes('es') && <Badge variant="secondary" className="text-xs">✓</Badge>}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {!availableLanguages.includes(currentLang) && (
+                <Badge variant="destructive">Nova Tradução</Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle>Informações do Post</CardTitle>
+            <CardTitle>Informações do Post {isEdit && `(${currentLang.toUpperCase()})`}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">

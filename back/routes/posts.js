@@ -177,21 +177,40 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
         tagId: parseInt(tagId)
       })) : [];
 
+      // Gerar URL amigável com prefixo pt/
+      let urlFinal = urlAmigavel.startsWith('pt/') ? urlAmigavel : `pt/${urlAmigavel}`;
+      
+      // Verificar se já existe
+      let contador = 1;
+      let urlTemp = urlFinal;
+      while (await prisma.postTranslation.findUnique({ where: { urlAmigavel: urlTemp } })) {
+        const baseSlug = urlAmigavel.replace('pt/', '');
+        urlTemp = `pt/${baseSlug}-${contador}`;
+        contador++;
+      }
+      urlFinal = urlTemp;
+
       const response = await prisma.post.create({
         data: {
-          titulo, 
-          chamada, 
-          conteudo,
-          urlAmigavel,
           status: status || 'RASCUNHO',
           destaque: destaque === 'true' || destaque === true,
           dataPublicacao: dataPublicacao ? new Date(dataPublicacao) : null,
           imagens: imagens,
+          idiomaDefault: 'pt',
           sites: {
             create: sitesData
           },
           tags: {
             create: tagsData
+          },
+          translations: {
+            create: {
+              idioma: 'pt',
+              titulo,
+              chamada,
+              conteudo,
+              urlAmigavel: urlFinal
+            }
           }
         },
         include: {
@@ -204,7 +223,8 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
             include: {
               tag: true
             }
-          }
+          },
+          translations: true
         }
       });
         
@@ -228,10 +248,12 @@ router.get('/posts', async (req, res, next) => {
         console.log('Recebendo requisição GET /posts');
         console.log('Query params:', req.query);
 
+        // Idioma solicitado (default: pt)
+        const lang = req.query.lang || 'pt';
+
         // Criar objeto de filtro apenas com parâmetros definidos
         const filtro = {};
         
-        if (req.query.urlAmigavel) filtro.urlAmigavel = req.query.urlAmigavel;
         if (req.query.status) filtro.status = req.query.status;
         if (req.query.destaque) filtro.destaque = req.query.destaque === 'true';
         
@@ -267,19 +289,49 @@ router.get('/posts', async (req, res, next) => {
                     include: {
                         tag: true
                     }
+                },
+                translations: {
+                    where: {
+                        idioma: lang
+                    }
                 }
             },
             orderBy: {
                 dataPublicacao: 'desc'
             }
         });
-                
-        const postsCompleto = posts.map(post => ({
-            ...post,
-            url: `${baseUrl}/posts/${post.urlAmigavel}`
-        }));
 
-        console.log(`Posts encontrados: ${postsCompleto.length}`);
+        // Transformar posts para incluir dados da tradução no nível raiz
+        const postsCompleto = posts.map(post => {
+            const translation = post.translations[0]; // Pega a tradução do idioma solicitado
+            
+            if (!translation) {
+                console.warn(`⚠️  Post #${post.id} não tem tradução em ${lang}`);
+                return null; // Ignora posts sem tradução no idioma solicitado
+            }
+
+            return {
+                id: post.id,
+                titulo: translation.titulo,
+                chamada: translation.chamada,
+                conteudo: translation.conteudo,
+                urlAmigavel: translation.urlAmigavel,
+                imagens: post.imagens,
+                status: post.status,
+                destaque: post.destaque,
+                dataPublicacao: post.dataPublicacao,
+                idiomaDefault: post.idiomaDefault,
+                createdAt: post.createdAt,
+                updatedAt: post.updatedAt,
+                sites: post.sites,
+                tags: post.tags,
+                url: `${baseUrl}/posts/${translation.urlAmigavel}`,
+                // Manter referência às traduções disponíveis
+                translationsAvailable: posts.find(p => p.id === post.id)?.translations?.map(t => t.idioma) || [lang]
+            };
+        }).filter(post => post !== null); // Remove posts sem tradução
+
+        console.log(`Posts encontrados: ${postsCompleto.length} (idioma: ${lang})`);
         res.status(200).json(postsCompleto);
         
     } catch (error) {
@@ -291,6 +343,7 @@ router.get('/posts', async (req, res, next) => {
 router.get('/posts/id/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
+        const lang = req.query.lang || 'pt';
 
         const post = await prisma.post.findUnique({
             where: {
@@ -306,15 +359,49 @@ router.get('/posts/id/:id', async (req, res, next) => {
                     include: {
                         tag: true
                     }
-                }
+                },
+                translations: true // Incluir todas as traduções
             }
         });
         
         if (!post) {
             throw new NotFoundError('Post não encontrado');
         }
+
+        // Encontrar tradução no idioma solicitado
+        const translation = post.translations.find(t => t.idioma === lang);
         
-        res.json(post);
+        if (!translation) {
+            return res.status(404).json({
+                error: `Tradução não disponível em ${lang}`,
+                availableLanguages: post.translations.map(t => t.idioma)
+            });
+        }
+
+        // Montar resposta com dados da tradução
+        const postCompleto = {
+            id: post.id,
+            titulo: translation.titulo,
+            chamada: translation.chamada,
+            conteudo: translation.conteudo,
+            urlAmigavel: translation.urlAmigavel,
+            imagens: post.imagens,
+            status: post.status,
+            destaque: post.destaque,
+            dataPublicacao: post.dataPublicacao,
+            idiomaDefault: post.idiomaDefault,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt,
+            sites: post.sites,
+            tags: post.tags,
+            translations: post.translations.map(t => ({
+                idioma: t.idioma,
+                titulo: t.titulo,
+                urlAmigavel: t.urlAmigavel
+            }))
+        };
+        
+        res.json(postCompleto);
     } catch (error) {
         next(error);
     }
@@ -322,36 +409,68 @@ router.get('/posts/id/:id', async (req, res, next) => {
 
 
 // Obter post pela URL amigável (público)
-router.get('/posts/:urlAmigavel', async (req, res, next) => {
+router.get('/posts/:lang/:slug', async (req, res, next) => {
     try {
-        console.log('Recebendo requisição GET /posts/:urlAmigavel');
-        console.log('URL Amigável:', req.params.urlAmigavel);
+        console.log('Recebendo requisição GET /posts/:lang/:slug');
+        const { lang, slug } = req.params;
+        const urlAmigavel = `${lang}/${slug}`;
+        console.log('URL Amigável completa:', urlAmigavel);
 
-        const { urlAmigavel } = req.params;
-        const post = await prisma.post.findUnique({
+        // Buscar tradução pela URL amigável
+        const translation = await prisma.postTranslation.findUnique({
             where: {
                 urlAmigavel: urlAmigavel
             },
             include: {
-                sites: {
+                post: {
                     include: {
-                        site: true
-                    }
-                },
-                tags: {
-                    include: {
-                        tag: true
+                        sites: {
+                            include: {
+                                site: true
+                            }
+                        },
+                        tags: {
+                            include: {
+                                tag: true
+                            }
+                        },
+                        translations: true
                     }
                 }
             }
         });
         
-        if (!post) {
+        if (!translation) {
             throw new NotFoundError('Post não encontrado');
         }
+
+        const post = translation.post;
         
-        res.json(post);
-        console.log('Post encontrado:', post.titulo);
+        // Montar resposta
+        const postCompleto = {
+            id: post.id,
+            titulo: translation.titulo,
+            chamada: translation.chamada,
+            conteudo: translation.conteudo,
+            urlAmigavel: translation.urlAmigavel,
+            imagens: post.imagens,
+            status: post.status,
+            destaque: post.destaque,
+            dataPublicacao: post.dataPublicacao,
+            idiomaDefault: post.idiomaDefault,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt,
+            sites: post.sites,
+            tags: post.tags,
+            translations: post.translations.map(t => ({
+                idioma: t.idioma,
+                titulo: t.titulo,
+                urlAmigavel: t.urlAmigavel
+            }))
+        };
+        
+        res.json(postCompleto);
+        console.log('Post encontrado:', translation.titulo);
     } catch (error) {
         next(error);
     }
@@ -363,6 +482,7 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
         console.log('Recebendo requisição PUT /posts');
 
         const { id } = req.params;
+        const lang = req.query.lang || 'pt'; // Idioma da tradução a atualizar
         const {
             titulo,
             chamada,
@@ -378,52 +498,84 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
 
         // Verificar se post existe
         const postExistente = await prisma.post.findUnique({
-            where: { id: parseInt(id) }
+            where: { id: parseInt(id) },
+            include: {
+                translations: true
+            }
         });
 
         if (!postExistente) {
             throw new NotFoundError('Post não encontrado');
         }
 
-        // Processar imagens
-        let imagens = [];
+        // Processar imagens (armazenadas no post base)
+        let imagens = postExistente.imagens || [];
         if (oldImages) {
-            imagens = JSON.parse(oldImages); // Imagens antigas mantidas
+            imagens = JSON.parse(oldImages);
         }
         if (req.files && req.files.length > 0) {
-            const novasImagens = req.files.map(file => file.location); // URLs do S3
+            const novasImagens = req.files.map(file => file.location);
             imagens = [...imagens, ...novasImagens];
         }
 
-        const data = {
-            titulo,
-            chamada,
-            conteudo,
-            urlAmigavel,
+        // Atualizar dados do post base
+        const dataPost = {
             status: status || postExistente.status,
             destaque: destaque === 'true' || destaque === true,
             dataPublicacao: dataPublicacao ? new Date(dataPublicacao) : postExistente.dataPublicacao,
             imagens
         };
 
-        console.log('Atualizando post com dados:', data);
+        console.log(`Atualizando post #${id} e tradução ${lang}...`);
 
-        const response = await prisma.post.update({
+        // Atualizar post base
+        await prisma.post.update({
             where: { id: parseInt(id) },
-            data: data,
-            include: {
-                sites: {
-                    include: {
-                        site: true
-                    }
-                },
-                tags: {
-                    include: {
-                        tag: true
-                    }
-                }
-            }
+            data: dataPost
         });
+
+        // Verificar se existe tradução no idioma solicitado
+        const translationExistente = postExistente.translations.find(t => t.idioma === lang);
+
+        if (titulo || chamada || conteudo || urlAmigavel) {
+            if (translationExistente) {
+                // Atualizar tradução existente
+                const dataTranslation = {};
+                if (titulo) dataTranslation.titulo = titulo;
+                if (chamada) dataTranslation.chamada = chamada;
+                if (conteudo) dataTranslation.conteudo = conteudo;
+                if (urlAmigavel) {
+                    // Garantir prefixo de idioma
+                    const urlFinal = urlAmigavel.startsWith(`${lang}/`) ? urlAmigavel : `${lang}/${urlAmigavel}`;
+                    dataTranslation.urlAmigavel = urlFinal;
+                }
+
+                await prisma.postTranslation.update({
+                    where: { id: translationExistente.id },
+                    data: dataTranslation
+                });
+            } else {
+                // Criar nova tradução
+                if (!titulo || !chamada || !conteudo || !urlAmigavel) {
+                    return res.status(400).json({
+                        error: 'Para criar nova tradução, todos os campos são obrigatórios: titulo, chamada, conteudo, urlAmigavel'
+                    });
+                }
+
+                const urlFinal = urlAmigavel.startsWith(`${lang}/`) ? urlAmigavel : `${lang}/${urlAmigavel}`;
+
+                await prisma.postTranslation.create({
+                    data: {
+                        postId: parseInt(id),
+                        idioma: lang,
+                        titulo,
+                        chamada,
+                        conteudo,
+                        urlAmigavel: urlFinal
+                    }
+                });
+            }
+        }
 
         // Atualizar sites
         if (sites) {
@@ -459,8 +611,103 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
             }
         }
 
+        // Buscar post atualizado
+        const response = await prisma.post.findUnique({
+            where: { id: parseInt(id) },
+            include: {
+                sites: {
+                    include: {
+                        site: true
+                    }
+                },
+                tags: {
+                    include: {
+                        tag: true
+                    }
+                },
+                translations: true
+            }
+        });
+
         console.log('Post atualizado com sucesso');
         res.status(200).json(response);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Adicionar ou atualizar tradução de um post (protegido)
+router.post('/posts/:id/translations', authenticateToken, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { idioma, titulo, chamada, conteudo, urlAmigavel } = req.body;
+
+        console.log(`📝 Adicionando/atualizando tradução ${idioma} para post #${id}`);
+
+        // Validar campos obrigatórios
+        if (!idioma || !titulo || !chamada || !conteudo || !urlAmigavel) {
+            return res.status(400).json({
+                error: 'Campos obrigatórios: idioma, titulo, chamada, conteudo, urlAmigavel'
+            });
+        }
+
+        // Validar idioma
+        if (!['pt', 'en', 'es'].includes(idioma)) {
+            return res.status(400).json({
+                error: 'Idioma inválido. Use: pt, en ou es'
+            });
+        }
+
+        // Verificar se post existe
+        const post = await prisma.post.findUnique({
+            where: { id: parseInt(id) },
+            include: { translations: true }
+        });
+
+        if (!post) {
+            throw new NotFoundError('Post não encontrado');
+        }
+
+        // Garantir prefixo de idioma na URL
+        const urlFinal = urlAmigavel.startsWith(`${idioma}/`) 
+            ? urlAmigavel 
+            : `${idioma}/${urlAmigavel}`;
+
+        // Verificar se tradução já existe
+        const translationExistente = post.translations.find(t => t.idioma === idioma);
+
+        let translation;
+        if (translationExistente) {
+            // Atualizar existente
+            translation = await prisma.postTranslation.update({
+                where: { id: translationExistente.id },
+                data: {
+                    titulo,
+                    chamada,
+                    conteudo,
+                    urlAmigavel: urlFinal
+                }
+            });
+            console.log(`✅ Tradução ${idioma} atualizada`);
+        } else {
+            // Criar nova
+            translation = await prisma.postTranslation.create({
+                data: {
+                    postId: parseInt(id),
+                    idioma,
+                    titulo,
+                    chamada,
+                    conteudo,
+                    urlAmigavel: urlFinal
+                }
+            });
+            console.log(`✅ Tradução ${idioma} criada`);
+        }
+
+        res.status(200).json({
+            message: `Tradução ${idioma} ${translationExistente ? 'atualizada' : 'criada'} com sucesso`,
+            translation
+        });
     } catch (error) {
         next(error);
     }

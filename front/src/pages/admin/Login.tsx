@@ -57,7 +57,7 @@ export default function AdminLogin() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 flex flex-col items-center">
-          <img src={logo} alt="Logo" className="mt-5" />
+          <h1 className="text-2xl font-bold">Login</h1>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

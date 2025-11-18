@@ -1,11 +1,11 @@
 import apiClient, { handleApiError } from '@/lib/api-client';
-import { Post, PostFormData } from '@/types/admin';
+import { Post, PostFormData, TranslationFormData } from '@/types/admin';
 
 export const postsService = {
   /**
    * Listar todos os posts
    */
-  async getAll(filters?: { site?: string; tag?: string; status?: string }): Promise<Post[]> {
+  async getAll(filters?: { site?: string; tag?: string; status?: string; lang?: string }): Promise<Post[]> {
     try {
       const response = await apiClient.get<Post[]>('/posts', { params: filters });
       return response.data;
@@ -17,9 +17,10 @@ export const postsService = {
   /**
    * Obter post por ID
    */
-  async getById(id: number): Promise<Post> {
+  async getById(id: number, lang?: string): Promise<Post> {
     try {
-      const response = await apiClient.get<Post>(`/posts/id/${id}`);
+      const params = lang ? { lang } : {};
+      const response = await apiClient.get<Post>(`/posts/id/${id}`, { params });
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));
@@ -27,11 +28,11 @@ export const postsService = {
   },
 
   /**
-   * Obter post por URL amigável
+   * Obter post por URL amigável (slug já inclui idioma: /pt/slug, /en/slug, etc)
    */
-  async getBySlug(slug: string): Promise<Post> {
+  async getBySlug(lang: string, slug: string): Promise<Post> {
     try {
-      const response = await apiClient.get<Post>(`/posts/${slug}`);
+      const response = await apiClient.get<Post>(`/posts/${lang}/${slug}`);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));
@@ -86,9 +87,9 @@ export const postsService = {
   },
 
   /**
-   * Atualizar post
+   * Atualizar post (com suporte a idioma específico)
    */
-  async update(id: number, data: Partial<PostFormData>): Promise<Post> {
+  async update(id: number, data: Partial<PostFormData>, lang?: string): Promise<Post> {
     try {
       const formData = new FormData();
 
@@ -121,14 +122,30 @@ export const postsService = {
         });
       }
 
-      console.log('📦 [UPDATE] FormData pronto para atualizar post');
+      console.log(`📦 [UPDATE] FormData pronto para atualizar post (idioma: ${lang || 'pt'})`);
+
+      // Adicionar query param de idioma se especificado
+      const params = lang ? { lang } : {};
 
       const response = await apiClient.put<Post>(`/posts/${id}`, formData, {
+        params,
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
+   * Adicionar ou atualizar tradução de um post
+   */
+  async addTranslation(postId: number, translation: TranslationFormData): Promise<Post> {
+    try {
+      const response = await apiClient.post<Post>(`/posts/${postId}/translations`, translation);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));
