@@ -16,8 +16,7 @@ import {
 
 import { FileText, Users, LogOut, LayoutDashboard, User, Tags, FolderOpen, Lightbulb, Rss } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-/*import { ThemeToggle } from '@/components/ui/theme-toggle';*/
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 
   const menuItems = [
@@ -114,7 +113,10 @@ export function AdminLayout() {
 
         <main className="flex-1 flex flex-col">
           <header className="h-14 border-b border-border bg-background flex items-center justify-between px-4">
-            <SidebarTrigger />            
+            <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+            </div>
           </header>
           <div className="flex-1 p-6 bg-muted/30">
             <Outlet />
