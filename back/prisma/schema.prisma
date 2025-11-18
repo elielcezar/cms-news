@@ -99,12 +99,14 @@ model Pauta {
   fontes    Json     // Array de {nome: string, url: string}
   siteId    Int?
   site      Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  lida      Boolean  @default(false) // Indica se a pauta foi visualizada
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("pautas")
   @@index([createdAt])
   @@index([siteId])
+  @@index([lida])
 }
 
 model Fonte {

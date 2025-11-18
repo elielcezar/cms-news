@@ -37,7 +37,7 @@ export default function PostForm() {
     urlAmigavel: '',
     status: 'RASCUNHO',
     destaque: false,
-    dataPublicacao: '',
+    dataPublicacao: new Date().toISOString().slice(0, 16), // Data atual no formato datetime-local
     sites: [],
     tags: [],
     imagens: [],
@@ -72,6 +72,13 @@ export default function PostForm() {
       const sitesIds = post.sites?.map(s => s.site.id) || [];
       const tagsIds = post.tags?.map(t => t.tag.id) || [];
       
+      // Converter data para formato datetime-local (YYYY-MM-DDTHH:mm)
+      let dataFormatada = '';
+      if (post.dataPublicacao) {
+        const date = new Date(post.dataPublicacao);
+        dataFormatada = date.toISOString().slice(0, 16); // Remove segundos e timezone
+      }
+      
       setFormData({
         titulo: post.titulo,
         chamada: post.chamada,
@@ -79,7 +86,7 @@ export default function PostForm() {
         urlAmigavel: post.urlAmigavel,
         status: post.status,
         destaque: post.destaque,
-        dataPublicacao: post.dataPublicacao || '',
+        dataPublicacao: dataFormatada,
         sites: sitesIds,
         tags: tagsIds,
         imagens: [],

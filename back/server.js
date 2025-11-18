@@ -8,6 +8,7 @@ import sitesRoutes from './routes/sites.js';
 import tagsRoutes from './routes/tags.js';
 import pautasRoutes from './routes/pautas.js';
 import fontesRoutes from './routes/fontes.js';
+import uploadRoutes from './routes/upload.js';
 import { errorHandler } from './utils/errors.js';
 
 // Carregar variáveis de ambiente do arquivo .env
@@ -69,6 +70,7 @@ app.use('/api', sitesRoutes);
 app.use('/api', tagsRoutes);
 app.use('/api', pautasRoutes);
 app.use('/api', fontesRoutes);
+app.use('/api', uploadRoutes);
 
 // Servir arquivos estáticos (se existirem uploads locais antigos)
 app.use('/uploads', express.static('uploads'));

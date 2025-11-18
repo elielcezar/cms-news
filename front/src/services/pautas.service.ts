@@ -36,5 +36,31 @@ export const pautasService = {
       throw new Error(handleApiError(error));
     }
   },
+
+  /**
+   * Converter pauta em post usando IA
+   */
+  async convertToPost(id: number): Promise<{ postId: number; message: string }> {
+    try {
+      const response = await apiClient.post<{ postId: number; message: string }>(
+        `/pautas/${id}/converter-em-post`
+      );
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
+   * Marcar pauta como lida
+   */
+  async markAsRead(id: number): Promise<Pauta> {
+    try {
+      const response = await apiClient.patch<Pauta>(`/pautas/${id}/marcar-lida`);
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
 };
 

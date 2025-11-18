@@ -17,6 +17,7 @@ export interface Pauta {
   }[];
   siteId?: number;
   site?: Site;
+  lida: boolean; // Indica se a pauta foi visualizada
   createdAt: string;
   updatedAt: string;
 }

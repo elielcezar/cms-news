@@ -27,7 +27,8 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function Pautas() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPauta, setSelectedPauta] = useState<Pauta | null>(null);
+  const [selectedPauta, setSelectedPauta] = useState<Pauta | null>(null);  // Logo após os outros estados (linha ~30)
+  const [convertingPautaId, setConvertingPautaId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -58,6 +59,36 @@ export default function Pautas() {
     },
   });
 
+  // Mutation para marcar como lida
+  const markAsRead = useMutation({
+    mutationFn: (id: number) => pautasService.markAsRead(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pautas'] });
+    },
+  });
+
+  // Mutation para converter em post
+  const convertToPost = useMutation({
+    mutationFn: (id: number) => pautasService.convertToPost(id),
+    onSuccess: (data) => {
+      setConvertingPautaId(null);
+      toast({
+        title: 'Post criado com sucesso!',
+        description: 'A notícia foi gerada pela IA e salva como rascunho.',
+      });
+      // Redirecionar para edição do post
+      navigate(`/admin/posts/${data.postId}/editar`);
+    },
+    onError: (error: Error) => {
+      setConvertingPautaId(null);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao converter pauta',
+        description: error.message || 'Não foi possível gerar a notícia com IA.',
+      });
+    },
+  });
+
   const handleDelete = (id: number) => {
     if (confirm('Tem certeza que deseja excluir esta sugestão de pauta?')) {
       deletePauta.mutate(id);
@@ -67,33 +98,24 @@ export default function Pautas() {
   const handleViewDetails = (pauta: Pauta) => {
     setSelectedPauta(pauta);
     setIsDialogOpen(true);
+    
+    // Marcar como lida ao abrir
+    if (!pauta.lida) {
+      markAsRead.mutate(pauta.id);
+    }
   };
 
-  const handleConvertToPost = (pauta: Pauta) => {
-    // Formatar as fontes como lista HTML
-    const fontesHtml = pauta.fontes
-      .map(fonte => `<p><a href="${fonte.url}" target="_blank" rel="noopener noreferrer">${fonte.nome}</a></p>`)
-      .join('\n');
+  const handleConvertToPost = (pautaId: number) => {
+    if (convertToPost.isPending) return; // Evitar múltiplos cliques
 
-    const conteudoCompleto = `
-      <h2>Resumo</h2>
-      <p>${pauta.resumo}</p>
-      
-      <h2>Fontes</h2>
-      ${fontesHtml}
-    `;
+    setConvertingPautaId(pautaId); // Define qual pauta está sendo convertida
 
-    // Navegar para o formulário de post com os dados preenchidos
-    navigate('/admin/posts/novo', {
-      state: {
-        fromPauta: {
-          titulo: pauta.assunto,
-          chamada: pauta.resumo.substring(0, 200) + (pauta.resumo.length > 200 ? '...' : ''),
-          conteudo: conteudoCompleto.trim(),
-          siteId: pauta.siteId,
-        }
-      }
+    toast({
+      title: 'Gerando notícia...',
+      description: 'A IA está criando uma notícia completa baseada nas fontes. Isso pode levar alguns segundos.',
     });
+
+    convertToPost.mutate(pautaId);
   };
 
   const filteredPautas = (pautas || []).filter((pauta) => {
@@ -164,9 +186,16 @@ export default function Pautas() {
                 </TableRow>
               ) : (
                 filteredPautas.map((pauta) => (
-                  <TableRow key={pauta.id}>
+                  <TableRow key={pauta.id} className={!pauta.lida ? 'font-semibold' : ''}>
                     <TableCell className="font-medium">{pauta.id}</TableCell>
-                    <TableCell className="font-semibold">{truncate(pauta.assunto, 50)}</TableCell>
+                    <TableCell className={!pauta.lida ? 'font-bold' : ''}>
+                      <div className="flex items-center gap-2">
+                        {!pauta.lida && (
+                          <Badge variant="default" className="text-xs">Nova</Badge>
+                        )}
+                        {truncate(pauta.assunto, 50)}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {truncate(pauta.resumo, 80)}
                     </TableCell>
@@ -197,10 +226,15 @@ export default function Pautas() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleConvertToPost(pauta)}
-                          title="Converter em post"
+                          onClick={() => handleConvertToPost(pauta.id)}
+                          disabled={convertingPautaId !== null}
+                          title="Converter em post com IA"
                         >
-                          <FileEdit className="h-4 w-4" />
+                          {convertingPautaId === pauta.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <FileEdit className="h-4 w-4" />
+                          )}
                         </Button>
                         <Button
                           variant="ghost"
@@ -266,17 +300,30 @@ export default function Pautas() {
               <div className="pt-4 border-t flex gap-2">
                 <Button
                   onClick={() => {
-                    handleConvertToPost(selectedPauta);
-                    setIsDialogOpen(false);
+                    if (selectedPauta) {
+                      handleConvertToPost(selectedPauta.id);
+                      setIsDialogOpen(false);
+                    }
                   }}
+                  disabled={convertingPautaId !== null}
                   className="flex-1"
                 >
-                  <FileEdit className="h-4 w-4 mr-2" />
-                  Converter em Post
+                  {convertingPautaId !== null ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Gerando notícia com IA...
+                    </>
+                  ) : (
+                    <>
+                      <FileEdit className="h-4 w-4 mr-2" />
+                      Converter em Post com IA
+                    </>
+                  )}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => setIsDialogOpen(false)}
+                  disabled={convertingPautaId !== null}
                 >
                   Fechar
                 </Button>

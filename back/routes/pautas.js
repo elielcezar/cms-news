@@ -3,6 +3,7 @@ import prisma from '../config/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { authenticateApiKey } from '../middleware/apiKeyAuth.js';
 import { validate, pautaCreateSchema } from '../middleware/validation.js';
+import { fetchContentWithJina, generateNewsWithAI, generateSlug } from '../services/aiService.js';
 
 const router = express.Router();
 
@@ -127,6 +128,148 @@ router.delete('/pautas/:id', authenticateToken, async (req, res, next) => {
         res.status(200).json({ message: 'Pauta deletada com sucesso' });
     } catch (error) {
         console.error('❌ Erro ao deletar pauta:', error);
+        next(error);
+    }
+});
+
+/**
+ * Marcar pauta como lida (protegido por JWT)
+ * PATCH /api/pautas/:id/marcar-lida
+ */
+router.patch('/pautas/:id/marcar-lida', authenticateToken, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        console.log(`👁️ Marcando pauta ${id} como lida`);
+
+        const pauta = await prisma.pauta.update({
+            where: { id: parseInt(id) },
+            data: { lida: true },
+            include: {
+                site: true
+            }
+        });
+
+        console.log('✅ Pauta marcada como lida');
+        res.status(200).json(pauta);
+    } catch (error) {
+        console.error('❌ Erro ao marcar pauta como lida:', error);
+        next(error);
+    }
+});
+
+/**
+ * Converter pauta em post usando IA (protegido por JWT)
+ * POST /api/pautas/:id/converter-em-post
+ */
+router.post('/pautas/:id/converter-em-post', authenticateToken, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        console.log(`🤖 Recebendo requisição POST /pautas/${id}/converter-em-post`);
+
+        // Buscar pauta
+        const pauta = await prisma.pauta.findUnique({
+            where: { id: parseInt(id) },
+            include: {
+                site: true
+            }
+        });
+
+        if (!pauta) {
+            return res.status(404).json({ error: 'Pauta não encontrada' });
+        }
+
+        console.log(`📋 Pauta encontrada: "${pauta.assunto}"`);
+        console.log(`🔗 ${pauta.fontes.length} fonte(s) para processar`);
+
+        // Buscar conteúdo de todas as fontes usando Jina AI
+        const conteudosPromises = pauta.fontes.map(fonte => 
+            fetchContentWithJina(fonte.url).catch(err => {
+                console.warn(`⚠️ Erro ao buscar ${fonte.url}:`, err.message);
+                return ''; // Retorna vazio se falhar
+            })
+        );
+
+        const conteudos = await Promise.all(conteudosPromises);
+        const conteudosValidos = conteudos.filter(c => c.length > 0);
+
+        if (conteudosValidos.length === 0) {
+            return res.status(400).json({ 
+                error: 'Não foi possível obter conteúdo de nenhuma fonte' 
+            });
+        }
+
+        console.log(`✅ ${conteudosValidos.length} conteúdos obtidos com sucesso`);
+
+        // Gerar notícia com IA
+        console.log('🤖 Gerando notícia com IA...');
+        const newsData = await generateNewsWithAI({
+            assunto: pauta.assunto,
+            resumo: pauta.resumo,
+            conteudos: conteudosValidos
+        });
+
+        console.log(`✅ Notícia gerada: "${newsData.titulo}"`);
+
+        // Gerar slug único
+        let slug = generateSlug(newsData.titulo);
+        let slugFinal = slug;
+        let contador = 1;
+
+        // Verificar se slug já existe
+        while (await prisma.post.findUnique({ where: { urlAmigavel: slugFinal } })) {
+            slugFinal = `${slug}-${contador}`;
+            contador++;
+        }
+
+        // Criar post em rascunho
+        const post = await prisma.post.create({
+            data: {
+                titulo: newsData.titulo,
+                chamada: newsData.chamada,
+                conteudo: newsData.conteudo,
+                urlAmigavel: slugFinal,
+                status: 'RASCUNHO',
+                destaque: false,
+                imagens: [],
+                dataPublicacao: new Date(), // Data de criação do post
+                sites: pauta.siteId ? {
+                    create: {
+                        siteId: pauta.siteId
+                    }
+                } : undefined
+            },
+            include: {
+                sites: {
+                    include: {
+                        site: true
+                    }
+                },
+                tags: {
+                    include: {
+                        tag: true
+                    }
+                }
+            }
+        });
+
+        console.log(`✅ Post criado com sucesso! ID: ${post.id}`);
+
+        res.status(201).json({
+            message: 'Post criado com sucesso',
+            postId: post.id,
+            post: post
+        });
+
+    } catch (error) {
+        console.error('❌ Erro ao converter pauta em post:', error);
+        
+        // Mensagens de erro mais amigáveis
+        if (error.message.includes('OPENAI_API_KEY')) {
+            return res.status(500).json({ 
+                error: 'Serviço de IA não configurado. Contate o administrador.' 
+            });
+        }
+
         next(error);
     }
 });
