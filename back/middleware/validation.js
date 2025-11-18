@@ -55,7 +55,7 @@ export const postCreateSchema = z.object({
   conteudo: z.string().min(10, 'Conteúdo deve ter no mínimo 10 caracteres'),
   urlAmigavel: z.string()
     .min(3, 'URL amigável deve ter no mínimo 3 caracteres')
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'URL amigável deve conter apenas letras minúsculas, números e hífens'),
+    .regex(/^([a-z]{2}\/)?[a-z0-9]+(?:-[a-z0-9]+)*$/, 'URL amigável deve estar no formato: pt/titulo-post ou titulo-post'),
   status: z.enum(['RASCUNHO', 'PUBLICADO']).optional(),
   destaque: z.boolean().optional(),
   dataPublicacao: z.string().optional(), // ISO string
@@ -69,7 +69,7 @@ export const postUpdateSchema = z.object({
   conteudo: z.string().min(10, 'Conteúdo deve ter no mínimo 10 caracteres').optional(),
   urlAmigavel: z.string()
     .min(3, 'URL amigável deve ter no mínimo 3 caracteres')
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'URL amigável deve conter apenas letras minúsculas, números e hífens')
+    .regex(/^([a-z]{2}\/)?[a-z0-9]+(?:-[a-z0-9]+)*$/, 'URL amigável deve estar no formato: pt/titulo-post ou titulo-post')
     .optional(),
   status: z.enum(['RASCUNHO', 'PUBLICADO']).optional(),
   destaque: z.boolean().optional(),

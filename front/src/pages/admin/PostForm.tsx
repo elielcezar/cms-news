@@ -403,12 +403,15 @@ export default function PostForm() {
                 onChange={(e) => handleChange('urlAmigavel', e.target.value)}
                 required
                 disabled={isLoading}
-                placeholder="titulo-do-post"
-                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-                title="Use apenas letras minúsculas, números e hífens"
+                placeholder={isEdit ? `${currentLang}/titulo-do-post` : "titulo-do-post"}
+                pattern="^([a-z]{2}/)?[a-z0-9]+(?:-[a-z0-9]+)*$"
+                title="Use formato: pt/titulo-do-post ou apenas titulo-do-post"
               />
               <p className="text-sm text-muted-foreground">
-                Slug para URL (ex: meu-primeiro-post). Gerado automaticamente do título.
+                {isEdit 
+                  ? `Slug com idioma (ex: ${currentLang}/meu-post). O prefixo ${currentLang}/ é adicionado automaticamente.`
+                  : 'Slug para URL (ex: meu-primeiro-post). Gerado automaticamente do título.'
+                }
               </p>
             </div>
 
