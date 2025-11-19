@@ -129,7 +129,7 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
         status,
         destaque,
         dataPublicacao,
-        sites,
+        categorias,
         tags
       } = req.body;
 
@@ -168,9 +168,9 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
         
         console.log('💾 Criando post no banco de dados...');
         
-      // Criar relacionamentos de sites e tags
-      const sitesData = sites ? JSON.parse(sites).map(siteId => ({
-        siteId: parseInt(siteId)
+      // Criar relacionamentos de categorias e tags
+      const categoriasData = categorias ? JSON.parse(categorias).map(categoriaId => ({
+        categoriaId: parseInt(categoriaId)
       })) : [];
       
       const tagsData = tags ? JSON.parse(tags).map(tagId => ({
@@ -197,8 +197,8 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
           dataPublicacao: dataPublicacao ? new Date(dataPublicacao) : null,
           imagens: imagens,
           idiomaDefault: 'pt',
-          sites: {
-            create: sitesData
+          categorias: {
+            create: categoriasData
           },
           tags: {
             create: tagsData
@@ -214,9 +214,9 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
           }
         },
         include: {
-          sites: {
+          categorias: {
             include: {
-              site: true
+              categoria: true
             }
           },
           tags: {
@@ -258,9 +258,9 @@ router.get('/posts', async (req, res, next) => {
         if (req.query.destaque) filtro.destaque = req.query.destaque === 'true';
         
         if (req.query.site) {
-            filtro.sites = {
+            filtro.categorias = {
                 some: {
-                    site: {
+                    categoria: {
                         nome: req.query.site
                     }
                 }
@@ -280,9 +280,9 @@ router.get('/posts', async (req, res, next) => {
         const posts = await prisma.post.findMany({
             where: filtro,
             include: {
-                sites: {
+                categorias: {
                     include: {
-                        site: true
+                        categoria: true
                     }
                 },
                 tags: {
@@ -323,7 +323,7 @@ router.get('/posts', async (req, res, next) => {
                 idiomaDefault: post.idiomaDefault,
                 createdAt: post.createdAt,
                 updatedAt: post.updatedAt,
-                sites: post.sites,
+                categorias: post.categorias,
                 tags: post.tags,
                 url: `${baseUrl}/posts/${translation.urlAmigavel}`,
                 // Manter referência às traduções disponíveis
@@ -350,9 +350,9 @@ router.get('/posts/id/:id', async (req, res, next) => {
                 id: parseInt(id)
             },
             include: {
-                sites: {
+                categorias: {
                     include: {
-                        site: true
+                        categoria: true
                     }
                 },
                 tags: {
@@ -392,7 +392,7 @@ router.get('/posts/id/:id', async (req, res, next) => {
             idiomaDefault: post.idiomaDefault,
             createdAt: post.createdAt,
             updatedAt: post.updatedAt,
-            sites: post.sites,
+            categorias: post.categorias,
             tags: post.tags,
             translations: post.translations.map(t => ({
                 idioma: t.idioma,
@@ -424,9 +424,9 @@ router.get('/posts/:lang/:slug', async (req, res, next) => {
             include: {
                 post: {
                     include: {
-                        sites: {
+                        categorias: {
                             include: {
-                                site: true
+                                categoria: true
                             }
                         },
                         tags: {
@@ -460,7 +460,7 @@ router.get('/posts/:lang/:slug', async (req, res, next) => {
             idiomaDefault: post.idiomaDefault,
             createdAt: post.createdAt,
             updatedAt: post.updatedAt,
-            sites: post.sites,
+            categorias: post.categorias,
             tags: post.tags,
             translations: post.translations.map(t => ({
                 idioma: t.idioma,
@@ -491,7 +491,7 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
             status,
             destaque,
             dataPublicacao,
-            sites,
+            categorias,
             tags,
             oldImages
         } = req.body;
@@ -577,18 +577,18 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
             }
         }
 
-        // Atualizar sites
-        if (sites) {
+        // Atualizar categorias
+        if (categorias) {
             await prisma.postSite.deleteMany({
                 where: { postId: parseInt(id) }
             });
             
-            const sitesArray = JSON.parse(sites);
-            for (const siteId of sitesArray) {
+            const categoriasArray = JSON.parse(categorias);
+            for (const categoriaId of categoriasArray) {
                 await prisma.postSite.create({
                     data: {
                         postId: parseInt(id),
-                        siteId: parseInt(siteId)
+                        categoriaId: parseInt(categoriaId)
                     }
                 });
             }
@@ -615,9 +615,9 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
         const response = await prisma.post.findUnique({
             where: { id: parseInt(id) },
             include: {
-                sites: {
+                categorias: {
                     include: {
-                        site: true
+                        categoria: true
                     }
                 },
                 tags: {

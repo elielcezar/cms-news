@@ -2,18 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fontesService } from '@/services/fontes.service';
-import { sitesService } from '@/services/sites.service';
 import { FonteFormData } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -28,13 +20,6 @@ export default function FonteForm() {
   const [formData, setFormData] = useState<FonteFormData>({
     titulo: '',
     url: '',
-    siteId: 0,
-  });
-
-  // Buscar sites para o select
-  const { data: sites } = useQuery({
-    queryKey: ['sites'],
-    queryFn: () => sitesService.getAll(),
   });
 
   // Buscar fonte se for edição
@@ -49,7 +34,6 @@ export default function FonteForm() {
       setFormData({
         titulo: fonte.titulo,
         url: fonte.url,
-        siteId: fonte.siteId,
       });
     }
   }, [fonte, isEdit]);
@@ -117,15 +101,6 @@ export default function FonteForm() {
       return;
     }
 
-    if (formData.siteId === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'Campo obrigatório',
-        description: 'O site é obrigatório.',
-      });
-      return;
-    }
-
     if (isEdit) {
       updateMutation.mutate(formData);
     } else {
@@ -186,29 +161,6 @@ export default function FonteForm() {
               />
               <p className="text-sm text-muted-foreground">
                 URL do feed RSS, página inicial ou API da fonte de notícias
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="site">Site *</Label>
-              <Select
-                value={formData.siteId.toString()}
-                onValueChange={(value) => handleChange('siteId', parseInt(value))}
-                disabled={isLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um site" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sites?.map((site) => (
-                    <SelectItem key={site.id} value={site.id.toString()}>
-                      {site.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Site ao qual esta fonte está relacionada
               </p>
             </div>
 

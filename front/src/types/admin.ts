@@ -15,8 +15,6 @@ export interface Pauta {
     nome: string;
     url: string;
   }[];
-  siteId?: number;
-  site?: Site;
   lida: boolean; // Indica se a pauta foi visualizada
   createdAt: string;
   updatedAt: string;
@@ -27,8 +25,6 @@ export interface Fonte {
   id: number;
   titulo: string;
   url: string;
-  siteId: number;
-  site: Site;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,19 +32,18 @@ export interface Fonte {
 export interface FonteFormData {
   titulo: string;
   url: string;
-  siteId: number;
 }
 
-// Site
-export interface Site {
+// Categoria
+export interface Categoria {
   id: number;
   nome: string;
   createdAt: string;
   updatedAt: string;
 }
 
-// Alias para compatibilidade
-export type Categoria = Site;
+// Alias para compatibilidade (removido após migração completa)
+export type Site = Categoria;
 
 // Tradução de Post
 export interface PostTranslation {
@@ -73,9 +68,9 @@ export interface Post {
   idiomaDefault: string;  // Idioma padrão
   createdAt: string;
   updatedAt: string;
-  sites?: {
+  categorias?: {
     id: number;
-    site: Site;
+    categoria: Categoria;
   }[];
   tags?: {
     id: number;
@@ -99,7 +94,7 @@ export interface PostFormData {
   status?: 'RASCUNHO' | 'PUBLICADO';
   destaque?: boolean;
   dataPublicacao?: string;
-  sites?: number[];       // Array de IDs de sites
+  categorias?: number[];  // Array de IDs de categorias
   tags?: number[];        // Array de IDs de tags
   imagens?: File[];       // Arquivos para upload
   oldImages?: string[];   // URLs existentes

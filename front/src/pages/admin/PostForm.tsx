@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { postsService } from '@/services/posts.service';
-import { sitesService } from '@/services/sites.service';
+import { categoriasService } from '@/services/categorias.service';
 import { tagsService } from '@/services/tags.service';
 import { PostFormData } from '@/types/admin';
 import { Button } from '@/components/ui/button';
@@ -41,21 +41,21 @@ export default function PostForm() {
     status: 'RASCUNHO',
     destaque: false,
     dataPublicacao: new Date().toISOString().slice(0, 16), // Data atual no formato datetime-local
-    sites: [],
+    categorias: [],
     tags: [],
     imagens: [],
     oldImages: [],
   });
 
   const [previewImages, setPreviewImages] = useState<string[]>([]);
-  const [selectedSites, setSelectedSites] = useState<number[]>([]);
+  const [selectedCategorias, setSelectedCategorias] = useState<number[]>([]);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>(['pt']);
 
-  // Buscar sites
-  const { data: sites } = useQuery({
-    queryKey: ['sites'],
-    queryFn: () => sitesService.getAll(),
+  // Buscar categorias
+  const { data: categorias } = useQuery({
+    queryKey: ['categorias'],
+    queryFn: () => categoriasService.getAll(),
   });
 
   // Buscar tags
@@ -80,7 +80,7 @@ export default function PostForm() {
 
   useEffect(() => {
     if (post && isEdit) {
-      const sitesIds = post.sites?.map(s => s.site.id) || [];
+      const categoriasIds = post.categorias?.map(c => c.categoria.id) || [];
       const tagsIds = post.tags?.map(t => t.tag.id) || [];
       
       // Idiomas disponíveis (traduções existentes)
@@ -102,13 +102,13 @@ export default function PostForm() {
         status: post.status,
         destaque: post.destaque,
         dataPublicacao: dataFormatada,
-        sites: sitesIds,
+        categorias: categoriasIds,
         tags: tagsIds,
         imagens: [],
         oldImages: post.imagens || [],
       });
       setPreviewImages(post.imagens || []);
-      setSelectedSites(sitesIds);
+      setSelectedCategorias(categoriasIds);
       setSelectedTags(tagsIds);
     }
   }, [post, isEdit]);
@@ -132,7 +132,7 @@ export default function PostForm() {
 
       // Selecionar site se fornecido
       if (pautaData.siteId) {
-        setSelectedSites([pautaData.siteId]);
+        // Pautas não têm mais relacionamento com categorias
       }
 
       toast({
@@ -190,7 +190,7 @@ export default function PostForm() {
 
     const dataToSubmit = {
       ...formData,
-      sites: selectedSites,
+      categorias: selectedCategorias,
       tags: selectedTags,
     };
 
@@ -311,8 +311,8 @@ export default function PostForm() {
   };
 
   // Toggle site
-  const toggleSite = (siteId: number) => {
-    setSelectedSites(prev => 
+  const toggleCategoria = (categoriaId: number) => {
+    setSelectedCategorias(prev => 
       prev.includes(siteId)
         ? prev.filter(id => id !== siteId)
         : [...prev, siteId]
@@ -496,15 +496,15 @@ export default function PostForm() {
                   <div key={site.id} className="flex items-center space-x-2">
                     <Checkbox
                       id={`site-${site.id}`}
-                      checked={selectedSites.includes(site.id)}
-                      onCheckedChange={() => toggleSite(site.id)}
+                      checked={selectedCategorias.includes(categoria.id)}
+                      onCheckedChange={() => toggleCategoria(categoria.id)}
                       disabled={isLoading}
                     />
                     <label
                       htmlFor={`site-${site.id}`}
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                     >
-                      {site.nome}
+                      {categoria.nome}
                     </label>
                   </div>
                 ))}

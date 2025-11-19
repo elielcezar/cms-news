@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import usuariosRoutes from './routes/usuarios.js';
 import postsRoutes from './routes/posts.js';
 import loginRoutes from './routes/login.js';
-import sitesRoutes from './routes/sites.js';
+import categoriasRoutes from './routes/categorias.js';
 import tagsRoutes from './routes/tags.js';
 import pautasRoutes from './routes/pautas.js';
 import fontesRoutes from './routes/fontes.js';
@@ -66,7 +66,7 @@ app.get('/health', (req, res) => {
 app.use('/api', loginRoutes);
 app.use('/api', usuariosRoutes);
 app.use('/api', postsRoutes);
-app.use('/api', sitesRoutes);
+app.use('/api', categoriasRoutes);
 app.use('/api', tagsRoutes);
 app.use('/api', pautasRoutes);
 app.use('/api', fontesRoutes);

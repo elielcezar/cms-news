@@ -59,7 +59,7 @@ export const postCreateSchema = z.object({
   status: z.enum(['RASCUNHO', 'PUBLICADO']).optional(),
   destaque: z.boolean().optional(),
   dataPublicacao: z.string().optional(), // ISO string
-  sites: z.array(z.number()).optional(),
+  categorias: z.array(z.number()).optional(),
   tags: z.array(z.number()).optional(),
 });
 
@@ -74,7 +74,7 @@ export const postUpdateSchema = z.object({
   status: z.enum(['RASCUNHO', 'PUBLICADO']).optional(),
   destaque: z.boolean().optional(),
   dataPublicacao: z.string().optional(),
-  sites: z.array(z.number()).optional(),
+  categorias: z.array(z.number()).optional(),
   tags: z.array(z.number()).optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'Pelo menos um campo deve ser fornecido para atualização',
@@ -98,19 +98,16 @@ export const pautaCreateSchema = z.object({
     nome: z.string().min(1, 'Nome da fonte é obrigatório'),
     url: z.string().url('URL inválida')
   })).min(1, 'Pelo menos uma fonte é obrigatória'),
-  siteId: z.number().int().positive().optional(),
 });
 
 export const fonteCreateSchema = z.object({
   titulo: z.string().min(3, 'Título deve ter no mínimo 3 caracteres'),
   url: z.string().url('URL inválida'),
-  siteId: z.number().int().positive('Site é obrigatório'),
 });
 
 export const fonteUpdateSchema = z.object({
   titulo: z.string().min(3, 'Título deve ter no mínimo 3 caracteres').optional(),
   url: z.string().url('URL inválida').optional(),
-  siteId: z.number().int().positive('Site é obrigatório').optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'Pelo menos um campo deve ser fornecido para atualização',
 });

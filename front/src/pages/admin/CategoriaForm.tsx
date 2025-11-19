@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sitesService } from '@/services/sites.service';
+import { categoriasService } from '@/services/categorias.service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
-export default function SiteForm() {
+export default function CategoriaForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -18,37 +18,37 @@ export default function SiteForm() {
 
   const [nome, setNome] = useState('');
 
-  // Buscar site se for edição
-  const { data: site } = useQuery({
-    queryKey: ['site', id],
+  // Buscar categoria se for edição
+  const { data: categoria } = useQuery({
+    queryKey: ['categoria', id],
     queryFn: async () => {
-      const allSites = await sitesService.getAll();
-      return allSites.find(s => s.id === Number(id));
+      const allCategorias = await categoriasService.getAll();
+      return allCategorias.find(c => c.id === Number(id));
     },
     enabled: isEdit && !!id,
   });
 
   useEffect(() => {
-    if (site && isEdit) {
-      setNome(site.nome);
+    if (categoria && isEdit) {
+      setNome(categoria.nome);
     }
-  }, [site, isEdit]);
+  }, [categoria, isEdit]);
 
   // Mutation para criar
   const createMutation = useMutation({
-    mutationFn: (data: { nome: string }) => sitesService.create(data),
+    mutationFn: (data: { nome: string }) => categoriasService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sites'] });
+      queryClient.invalidateQueries({ queryKey: ['categorias'] });
       toast({
-        title: 'Site criado',
-        description: 'O site foi criado com sucesso.',
+        title: 'Categoria criada',
+        description: 'A categoria foi criada com sucesso.',
       });
-      navigate('/admin/sites');
+      navigate('/admin/categorias');
     },
     onError: (error: Error) => {
       toast({
         variant: 'destructive',
-        title: 'Erro ao criar site',
+        title: 'Erro ao criar categoria',
         description: error.message,
       });
     },
@@ -56,20 +56,20 @@ export default function SiteForm() {
 
   // Mutation para atualizar
   const updateMutation = useMutation({
-    mutationFn: (data: { nome: string }) => sitesService.update(Number(id), data),
+    mutationFn: (data: { nome: string }) => categoriasService.update(Number(id), data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sites'] });
-      queryClient.invalidateQueries({ queryKey: ['site', id] });
+      queryClient.invalidateQueries({ queryKey: ['categorias'] });
+      queryClient.invalidateQueries({ queryKey: ['categoria', id] });
       toast({
-        title: 'Site atualizado',
-        description: 'O site foi atualizado com sucesso.',
+        title: 'Categoria atualizada',
+        description: 'A categoria foi atualizada com sucesso.',
       });
-      navigate('/admin/sites');
+      navigate('/admin/categorias');
     },
     onError: (error: Error) => {
       toast({
         variant: 'destructive',
-        title: 'Erro ao atualizar site',
+        title: 'Erro ao atualizar categoria',
         description: error.message,
       });
     },
@@ -82,7 +82,7 @@ export default function SiteForm() {
       toast({
         variant: 'destructive',
         title: 'Campo obrigatório',
-        description: 'O nome do site é obrigatório.',
+        description: 'O nome da categoria é obrigatório.',
       });
       return;
     }
@@ -99,15 +99,15 @@ export default function SiteForm() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/admin/sites')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/admin/categorias')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {isEdit ? 'Editar Site' : 'Novo Site'}
+            {isEdit ? 'Editar Categoria' : 'Nova Categoria'}
           </h1>
           <p className="text-muted-foreground">
-            {isEdit ? 'Edite as informações do site' : 'Preencha os dados do novo site'}
+            {isEdit ? 'Edite as informações da categoria' : 'Preencha os dados da nova categoria'}
           </p>
         </div>
       </div>
@@ -115,7 +115,7 @@ export default function SiteForm() {
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle>Informações do Site</CardTitle>
+            <CardTitle>Informações da Categoria</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -126,19 +126,19 @@ export default function SiteForm() {
                 onChange={(e) => setNome(e.target.value)}
                 required
                 disabled={isLoading}
-                placeholder="Ex: Portal Principal, Blog Tech, Site Notícias..."
+                placeholder="Ex: Tecnologia, Música, Eventos, Lifestyle..."
               />
             </div>
 
             <div className="flex gap-4 pt-4">
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEdit ? 'Salvar Alterações' : 'Criar Site'}
+                {isEdit ? 'Salvar Alterações' : 'Criar Categoria'}
               </Button>
               <Button 
                 type="button" 
                 variant="outline" 
-                onClick={() => navigate('/admin/sites')}
+                onClick={() => navigate('/admin/categorias')}
                 disabled={isLoading}
               >
                 Cancelar

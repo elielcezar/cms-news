@@ -11,8 +11,8 @@ import { AdminLayout } from "./components/admin/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";
 import Posts from "./pages/admin/Posts";
 import PostForm from "./pages/admin/PostForm";
-import Sites from "./pages/admin/Sites";
-import SiteForm from "./pages/admin/SiteForm";
+import Categorias from "./pages/admin/Categorias";
+import CategoriaForm from "./pages/admin/CategoriaForm";
 import Tags from "./pages/admin/Tags";
 import TagForm from "./pages/admin/TagForm";
 import Pautas from "./pages/admin/Pautas";
@@ -44,9 +44,9 @@ const App = () => (
                 <Route path="fontes" element={<Fontes />} />
                 <Route path="fontes/novo" element={<FonteForm />} />
                 <Route path="fontes/:id/editar" element={<FonteForm />} />
-                <Route path="sites" element={<Sites />} />
-                <Route path="sites/novo" element={<SiteForm />} />
-                <Route path="sites/:id/editar" element={<SiteForm />} />
+                <Route path="categorias" element={<Categorias />} />
+                <Route path="categorias/novo" element={<CategoriaForm />} />
+                <Route path="categorias/:id/editar" element={<CategoriaForm />} />
                 <Route path="tags" element={<Tags />} />
                 <Route path="tags/novo" element={<TagForm />} />
                 <Route path="tags/:id/editar" element={<TagForm />} />

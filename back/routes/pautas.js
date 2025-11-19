@@ -14,17 +14,13 @@ const router = express.Router();
 router.post('/pautas', authenticateApiKey, validate(pautaCreateSchema), async (req, res, next) => {
     try {
         console.log('📥 Recebendo requisição POST /pautas da IA');
-        const { assunto, resumo, fontes, siteId } = req.body;
+        const { assunto, resumo, fontes } = req.body;
 
         const pauta = await prisma.pauta.create({
             data: {
                 assunto,
                 resumo,
                 fontes,
-                siteId: siteId || null,
-            },
-            include: {
-                site: true,
             }
         });
 
@@ -45,11 +41,6 @@ router.get('/pautas', authenticateToken, async (req, res, next) => {
         console.log('📋 Recebendo requisição GET /pautas');
 
         const filtro = {};
-        
-        // Filtro por site
-        if (req.query.siteId) {
-            filtro.siteId = parseInt(req.query.siteId);
-        }
 
         // Filtro por busca no assunto
         if (req.query.search) {
@@ -58,9 +49,6 @@ router.get('/pautas', authenticateToken, async (req, res, next) => {
 
         const pautas = await prisma.pauta.findMany({
             where: filtro,
-            include: {
-                site: true,
-            },
             orderBy: {
                 createdAt: 'desc'
             }
@@ -84,10 +72,7 @@ router.get('/pautas/:id', authenticateToken, async (req, res, next) => {
         console.log(`📄 Recebendo requisição GET /pautas/${id}`);
 
         const pauta = await prisma.pauta.findUnique({
-            where: { id: parseInt(id) },
-            include: {
-                site: true,
-            }
+            where: { id: parseInt(id) }
         });
 
         if (!pauta) {
@@ -143,10 +128,7 @@ router.patch('/pautas/:id/marcar-lida', authenticateToken, async (req, res, next
 
         const pauta = await prisma.pauta.update({
             where: { id: parseInt(id) },
-            data: { lida: true },
-            include: {
-                site: true
-            }
+            data: { lida: true }
         });
 
         console.log('✅ Pauta marcada como lida');
@@ -168,10 +150,7 @@ router.post('/pautas/:id/converter-em-post', authenticateToken, async (req, res,
 
         // Buscar pauta
         const pauta = await prisma.pauta.findUnique({
-            where: { id: parseInt(id) },
-            include: {
-                site: true
-            }
+            where: { id: parseInt(id) }
         });
 
         if (!pauta) {
@@ -238,11 +217,6 @@ router.post('/pautas/:id/converter-em-post', authenticateToken, async (req, res,
                 imagens: [],
                 idiomaDefault: 'pt',
                 dataPublicacao: new Date(),
-                sites: pauta.siteId ? {
-                    create: {
-                        siteId: pauta.siteId
-                    }
-                } : undefined,
                 translations: {
                     create: idiomas.map(idioma => ({
                         idioma: idioma,
@@ -254,9 +228,9 @@ router.post('/pautas/:id/converter-em-post', authenticateToken, async (req, res,
                 }
             },
             include: {
-                sites: {
+                categorias: {
                     include: {
-                        site: true
+                        categoria: true
                     }
                 },
                 tags: {

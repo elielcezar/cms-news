@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sitesService } from '@/services/sites.service';
-import { Site } from '@/types/admin';
+import { categoriasService } from '@/services/categorias.service';
+import { Categoria } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -17,45 +17,45 @@ import { Input } from '@/components/ui/input';
 import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-export default function Sites() {
+export default function Categorias() {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Buscar sites
-  const { data: sites, isLoading } = useQuery({
-    queryKey: ['sites'],
-    queryFn: () => sitesService.getAll(),
+  // Buscar categorias
+  const { data: categorias, isLoading } = useQuery({
+    queryKey: ['categorias'],
+    queryFn: () => categoriasService.getAll(),
   });
 
   // Mutation para deletar
-  const deleteSite = useMutation({
-    mutationFn: (id: number) => sitesService.delete(id),
+  const deleteCategoria = useMutation({
+    mutationFn: (id: number) => categoriasService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sites'] });
+      queryClient.invalidateQueries({ queryKey: ['categorias'] });
       toast({
-        title: 'Site excluído',
-        description: 'O site foi excluído com sucesso.',
+        title: 'Categoria excluída',
+        description: 'A categoria foi excluída com sucesso.',
       });
     },
     onError: (error: Error) => {
       toast({
         variant: 'destructive',
-        title: 'Erro ao excluir site',
+        title: 'Erro ao excluir categoria',
         description: error.message,
       });
     },
   });
 
-  const filteredSites = (sites || []).filter((site) => {
+  const filteredCategorias = (categorias || []).filter((categoria) => {
     const searchLower = searchTerm.toLowerCase();
-    return site.nome.toLowerCase().includes(searchLower);
+    return categoria.nome.toLowerCase().includes(searchLower);
   });
 
   const handleDelete = (id: number) => {
-    if (confirm('Tem certeza que deseja excluir este site?')) {
-      deleteSite.mutate(id);
+    if (confirm('Tem certeza que deseja excluir esta categoria?')) {
+      deleteCategoria.mutate(id);
     }
   };
 
@@ -63,21 +63,21 @@ export default function Sites() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Sites</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Categorias</h1>
           <p className="text-muted-foreground">
-            Gerencie os sites dos posts
+            Gerencie as categorias dos posts
           </p>
         </div>
-        <Button onClick={() => navigate('/admin/sites/novo')}>
+        <Button onClick={() => navigate('/admin/categorias/novo')}>
           <Plus className="h-4 w-4 mr-2" />
-          Novo Site
+          Nova Categoria
         </Button>
       </div>
 
       <Card className="mb-4">
         <CardContent className="pt-6">
           <Input
-            placeholder="Buscar site..."
+            placeholder="Buscar categoria..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-md"
@@ -87,7 +87,7 @@ export default function Sites() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Sites</CardTitle>
+          <CardTitle>Lista de Categorias</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -106,34 +106,34 @@ export default function Sites() {
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
-              ) : filteredSites.length === 0 ? (
+              ) : filteredCategorias.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-muted-foreground">
-                    {searchTerm ? 'Nenhum site encontrado' : 'Nenhum site cadastrado'}
+                    {searchTerm ? 'Nenhuma categoria encontrada' : 'Nenhuma categoria cadastrada'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredSites.map((site) => (
-                  <TableRow key={site.id}>
-                    <TableCell className="font-medium">{site.id}</TableCell>
-                    <TableCell>{site.nome}</TableCell>
+                filteredCategorias.map((categoria) => (
+                  <TableRow key={categoria.id}>
+                    <TableCell className="font-medium">{categoria.id}</TableCell>
+                    <TableCell>{categoria.nome}</TableCell>
                     <TableCell>
-                      {new Date(site.createdAt).toLocaleDateString('pt-BR')}
+                      {new Date(categoria.createdAt).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => navigate(`/admin/sites/${site.id}/editar`)}
+                          onClick={() => navigate(`/admin/categorias/${categoria.id}/editar`)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(site.id)}
-                          disabled={deleteSite.isPending}
+                          onClick={() => handleDelete(categoria.id)}
+                          disabled={deleteCategoria.isPending}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

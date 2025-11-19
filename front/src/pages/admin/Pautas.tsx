@@ -20,12 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Eye, Trash2, Loader2, FileEdit, ExternalLink } from 'lucide-react';
@@ -33,7 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function Pautas() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPauta, setSelectedPauta] = useState<Pauta | null>(null);  // Logo após os outros estados (linha ~30)
+  const [selectedPauta, setSelectedPauta] = useState<Pauta | null>(null);
   const [convertingPautaId, setConvertingPautaId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const navigate = useNavigate();
@@ -133,19 +127,6 @@ export default function Pautas() {
     );
   });
 
-  // Agrupar pautas por site
-  const pautasPorSite = filteredPautas.reduce((acc, pauta) => {
-    const siteName = pauta.site?.nome || 'Sem Site';
-    if (!acc[siteName]) {
-      acc[siteName] = [];
-    }
-    acc[siteName].push(pauta);
-    return acc;
-  }, {} as Record<string, Pauta[]>);
-
-  // Ordenar sites alfabeticamente
-  const sitesOrdenados = Object.keys(pautasPorSite).sort();
-
   // Helper para truncar texto
   const truncate = (text: string, maxLength: number): string => {
     if (text.length <= maxLength) return text;
@@ -179,118 +160,90 @@ export default function Pautas() {
           <CardTitle>Lista de Sugestões ({filteredPautas.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          ) : filteredPautas.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">
-              {searchTerm ? 'Nenhuma pauta encontrada' : 'Nenhuma sugestão de pauta ainda'}
-            </div>
-          ) : (
-            <Accordion type="multiple" className="w-full space-y-3">
-              {sitesOrdenados.map((siteName) => {
-                const pautas = pautasPorSite[siteName];
-                const pautasNovas = pautas.filter(p => !p.lida).length;
-                
-                return (
-                  <AccordionItem 
-                    key={siteName} 
-                    value={siteName}
-                    className="border rounded-lg px-4 bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <AccordionTrigger className="hover:no-underline py-4">
-                      <div className="flex items-center gap-3 w-full">
-                        <Badge variant="secondary" className="text-sm font-semibold">
-                          {siteName}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {pautas.length} {pautas.length === 1 ? 'pauta' : 'pautas'}
-                        </span>
-                        {pautasNovas > 0 && (
-                          <Badge variant="default" className="text-xs ml-auto mr-2">
-                            {pautasNovas} {pautasNovas === 1 ? 'nova' : 'novas'}
-                          </Badge>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[60px]">ID</TableHead>
+                <TableHead>Assunto</TableHead>
+                <TableHead>Resumo</TableHead>
+                <TableHead className="w-[120px]">Data</TableHead>
+                <TableHead className="w-[200px] text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                  </TableCell>
+                </TableRow>
+              ) : filteredPautas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    {searchTerm ? 'Nenhuma pauta encontrada' : 'Nenhuma sugestão de pauta ainda'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredPautas.map((pauta) => (
+                  <TableRow key={pauta.id} className={!pauta.lida ? 'font-semibold' : ''}>
+                    <TableCell className="font-medium">{pauta.id}</TableCell>
+                    <TableCell className={!pauta.lida ? 'font-bold' : ''}>
+                      <div className="flex items-center gap-2">
+                        {!pauta.lida && (
+                          <Badge variant="default" className="text-xs">Nova</Badge>
                         )}
+                        {truncate(pauta.assunto, 50)}
                       </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[60px]">ID</TableHead>
-                            <TableHead>Assunto</TableHead>
-                            <TableHead>Resumo</TableHead>
-                            <TableHead className="w-[120px]">Data</TableHead>
-                            <TableHead className="w-[200px] text-right">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {pautas.map((pauta) => (
-                            <TableRow key={pauta.id} className={!pauta.lida ? 'font-semibold' : ''}>
-                              <TableCell className="font-medium">{pauta.id}</TableCell>
-                              <TableCell className={!pauta.lida ? 'font-bold' : ''}>
-                                <div className="flex items-center gap-2">
-                                  {!pauta.lida && (
-                                    <Badge variant="default" className="text-xs">Nova</Badge>
-                                  )}
-                                  {truncate(pauta.assunto, 50)}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {truncate(pauta.resumo, 80)}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {new Date(pauta.createdAt).toLocaleDateString('pt-BR', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                })}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleViewDetails(pauta)}
-                                    title="Ver detalhes"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleConvertToPost(pauta.id)}
-                                    disabled={convertingPautaId !== null}
-                                    title="Converter em post com IA"
-                                  >
-                                    {convertingPautaId === pauta.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <FileEdit className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDelete(pauta.id)}
-                                    disabled={deletePauta.isPending}
-                                    title="Excluir"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-          )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {truncate(pauta.resumo, 80)}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {new Date(pauta.createdAt).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleViewDetails(pauta)}
+                          title="Ver detalhes"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleConvertToPost(pauta.id)}
+                          disabled={convertingPautaId !== null}
+                          title="Converter em post com IA"
+                        >
+                          {convertingPautaId === pauta.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <FileEdit className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(pauta.id)}
+                          disabled={deletePauta.isPending}
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -299,13 +252,7 @@ export default function Pautas() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl">{selectedPauta?.assunto}</DialogTitle>
-            <DialogDescription>
-              {selectedPauta?.site && (
-                <Badge variant="secondary" className="mt-2">
-                  {selectedPauta.site.nome}
-                </Badge>
-              )}
-            </DialogDescription>
+            <DialogDescription />
           </DialogHeader>
           
           {selectedPauta && (
@@ -374,4 +321,3 @@ export default function Pautas() {
     </div>
   );
 }
-

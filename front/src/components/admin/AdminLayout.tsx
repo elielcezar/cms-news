@@ -24,7 +24,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
     { title: 'Posts', url: '/admin/posts', icon: FileText },
     { title: 'Sugestões de Pauta', url: '/admin/pautas', icon: Lightbulb },
     { title: 'Fontes', url: '/admin/fontes', icon: Rss },
-    { title: 'Sites', url: '/admin/sites', icon: FolderOpen },
+    { title: 'Categorias', url: '/admin/categorias', icon: FolderOpen },
     { title: 'Tags', url: '/admin/tags', icon: Tags },
     { title: 'Usuários', url: '/admin/usuarios', icon: Users },
   ];

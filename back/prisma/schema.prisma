@@ -22,15 +22,15 @@ model User {
 }
 
 model Post {
-  id              Int              @id @default(autoincrement())
-  imagens         Json             // Array de URLs das imagens no S3
-  status          PostStatus       @default(RASCUNHO)
-  destaque        Boolean          @default(false)
-  dataPublicacao  DateTime?        // Data de publicação
-  idiomaDefault   String           @default("pt") // Idioma padrão do post
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  sites           PostSite[]
+  id              Int               @id @default(autoincrement())
+  imagens         Json              // Array de URLs das imagens no S3
+  status          PostStatus        @default(RASCUNHO)
+  destaque        Boolean           @default(false)
+  dataPublicacao  DateTime?         // Data de publicação
+  idiomaDefault   String            @default("pt") // Idioma padrão do post
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  categorias      PostCategoria[]
   tags            PostTag[]
   translations    PostTranslation[]
 
@@ -64,27 +64,25 @@ enum PostStatus {
   PUBLICADO
 }
 
-model Site {
-  id        Int        @id @default(autoincrement())
-  nome      String     @unique
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  posts     PostSite[]
-  pautas    Pauta[]
-  fontes    Fonte[]
+model Categoria {
+  id        Int             @id @default(autoincrement())
+  nome      String          @unique
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  posts     PostCategoria[]
 
-  @@map("sites")
+  @@map("categorias")
 }
 
-model PostSite {
-  id      Int  @id @default(autoincrement())
-  postId  Int
-  siteId  Int
-  post    Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  site    Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+model PostCategoria {
+  id          Int       @id @default(autoincrement())
+  postId      Int
+  categoriaId Int
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
 
-  @@unique([postId, siteId])
-  @@map("post_sites")
+  @@unique([postId, categoriaId])
+  @@map("post_categorias")
 }
 
 model Tag {
@@ -113,15 +111,12 @@ model Pauta {
   assunto   String
   resumo    String   @db.Text
   fontes    Json     // Array de {nome: string, url: string}
-  siteId    Int?
-  site      Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
   lida      Boolean  @default(false) // Indica se a pauta foi visualizada
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("pautas")
   @@index([createdAt])
-  @@index([siteId])
   @@index([lida])
 }
 
@@ -129,12 +124,9 @@ model Fonte {
   id        Int      @id @default(autoincrement())
   titulo    String
   url       String
-  siteId    Int
-  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("fontes")
-  @@index([siteId])
   @@index([url])
 }
