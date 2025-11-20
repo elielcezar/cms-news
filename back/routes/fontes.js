@@ -32,10 +32,10 @@ router.post('/fontes', authenticateToken, validate(fonteCreateSchema), async (re
 });
 
 /**
- * Listar todas as fontes (protegido por JWT)
+ * Listar todas as fontes (protegido por JWT ou API Key)
  * GET /api/fontes
  */
-router.get('/fontes', authenticateToken, async (req, res, next) => {
+router.get('/fontes', authenticateJwtOrApiKey, async (req, res, next) => {
     try {
         console.log('📋 Recebendo requisição GET /fontes');
 
@@ -57,6 +57,13 @@ router.get('/fontes', authenticateToken, async (req, res, next) => {
         });
 
         console.log(`✅ ${fontes.length} fontes encontradas`);
+        
+        // Se for chamada via API Key (N8N), retornar formato esperado
+        if (req.headers['x-api-key']) {
+            return res.status(200).json({ fontes });
+        }
+        
+        // Se for chamada via JWT (admin), retornar array direto
         res.status(200).json(fontes);
     } catch (error) {
         console.error('❌ Erro ao listar fontes:', error);

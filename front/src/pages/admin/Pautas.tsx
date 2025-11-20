@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Trash2, Loader2, FileEdit, ExternalLink } from 'lucide-react';
+import { Eye, Trash2, Loader2, FileEdit, ExternalLink, Search, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Pautas() {
@@ -64,6 +64,28 @@ export default function Pautas() {
     mutationFn: (id: number) => pautasService.markAsRead(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pautas'] });
+    },
+  });
+
+  // Mutation para gerar pautas via N8N
+  const gerarPautas = useMutation({
+    mutationFn: () => pautasService.gerar(),
+    onSuccess: (data) => {
+      toast({
+        title: 'Busca Iniciada!',
+        description: data.message,
+      });
+      // Atualizar lista após 5 segundos
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['pautas'] });
+      }, 5000);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao buscar pautas',
+        description: error.message,
+      });
     },
   });
 
@@ -143,6 +165,43 @@ export default function Pautas() {
           </p>
         </div>
       </div>
+
+      {/* Botão Buscar Pautas - Destaque */}
+      <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-primary/10">
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-primary/10">
+                <Sparkles className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Buscar Novas Pautas</h3>
+                <p className="text-sm text-muted-foreground">
+                  A IA irá analisar as fontes cadastradas e sugerir novas pautas
+                </p>
+              </div>
+            </div>
+            <Button 
+              size="lg"
+              onClick={() => gerarPautas.mutate()}
+              disabled={gerarPautas.isPending}
+              className="gap-2"
+            >
+              {gerarPautas.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Buscando...
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4" />
+                  Buscar Pautas
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="mb-4">
         <CardContent className="pt-6">

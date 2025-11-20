@@ -62,5 +62,17 @@ export const pautasService = {
       throw new Error(handleApiError(error));
     }
   },
+
+  /**
+   * Disparar busca de novas pautas via N8N
+   */
+  async gerar(): Promise<{ message: string; status: string }> {
+    try {
+      const response = await apiClient.post<{ message: string; status: string }>('/pautas/gerar');
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
 };
 

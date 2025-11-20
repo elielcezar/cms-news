@@ -7,6 +7,10 @@ import { fetchContentWithJina, generateNewsWithAI, generateSlug } from '../servi
 
 const router = express.Router();
 
+// Configuração do webhook N8N
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.ecwd.cloud/webhook/buscar-pautas';
+const N8N_WEBHOOK_KEY = process.env.N8N_WEBHOOK_KEY || 'IdN:{+&M^3FpYd&Q8d';
+
 /**
  * Criar pauta (endpoint para n8n - protegido por API Key)
  * POST /api/pautas
@@ -28,6 +32,39 @@ router.post('/pautas', authenticateApiKey, validate(pautaCreateSchema), async (r
         res.status(201).json(pauta);
     } catch (error) {
         console.error('❌ Erro ao criar pauta:', error);
+        next(error);
+    }
+});
+
+/**
+ * Disparar busca de pautas via N8N (protegido por JWT)
+ * POST /api/pautas/gerar
+ */
+router.post('/pautas/gerar', authenticateToken, async (req, res, next) => {
+    try {
+        console.log('🔍 Disparando busca de pautas via N8N...');
+
+        // Chamar webhook do N8N
+        const response = await fetch(N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': N8N_WEBHOOK_KEY
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`N8N retornou erro: ${response.status}`);
+        }
+
+        console.log('✅ Webhook do N8N disparado com sucesso!');
+        
+        res.status(200).json({ 
+            message: 'Busca de pautas iniciada com sucesso! Aguarde alguns segundos e atualize a lista.',
+            status: 'processing'
+        });
+    } catch (error) {
+        console.error('❌ Erro ao disparar busca de pautas:', error);
         next(error);
     }
 });
