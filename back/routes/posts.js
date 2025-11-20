@@ -252,28 +252,78 @@ router.get('/posts', async (req, res, next) => {
         const lang = req.query.lang || 'pt';
 
         // Criar objeto de filtro apenas com parâmetros definidos
-        const filtro = {};
+        // IMPORTANTE: Endpoint público sempre retorna apenas posts PUBLICADOS
+        const filtro = {
+            status: 'PUBLICADO' // Sempre filtrar por status PUBLICADO
+        };
         
-        if (req.query.status) filtro.status = req.query.status;
-        if (req.query.destaque) filtro.destaque = req.query.destaque === 'true';
+        // Filtro por destaque/featured (aceita 'destaque' ou 'featured' para compatibilidade)
+        const destaqueValue = req.query.featured || req.query.destaque;
+        if (destaqueValue) filtro.destaque = destaqueValue === 'true';
         
-        if (req.query.site) {
-            filtro.categorias = {
-                some: {
-                    categoria: {
-                        nome: req.query.site
+        // Filtro por categoria (aceita 'category' ou 'categoria' para compatibilidade)
+        const categoriaValue = req.query.category || req.query.categoria;
+        if (categoriaValue) {
+            const categoriaId = parseInt(categoriaValue);
+            if (!isNaN(categoriaId)) {
+                // Filtrar por ID da categoria
+                filtro.categorias = {
+                    some: {
+                        categoriaId: categoriaId
                     }
-                }
+                };
+            } else {
+                // Filtrar por nome da categoria
+                filtro.categorias = {
+                    some: {
+                        categoria: {
+                            translations: {
+                                some: {
+                                    nome: categoriaValue,
+                                    idioma: lang
+                                }
+                            }
+                        }
+                    }
+                };
             }
         }
         
-        if (req.query.tag) {
-            filtro.tags = {
+        // Compatibilidade: aceitar 'site' também (legado)
+        if (req.query.site && !categoriaValue) {
+            filtro.categorias = {
                 some: {
-                    tag: {
-                        nome: req.query.tag
+                    categoria: {
+                        translations: {
+                            some: {
+                                nome: req.query.site,
+                                idioma: lang
+                            }
+                        }
                     }
                 }
+            };
+        }
+        
+        // Filtro por tag (nome ou ID)
+        if (req.query.tag) {
+            const tagId = parseInt(req.query.tag);
+            if (!isNaN(tagId)) {
+                // Filtrar por ID da tag
+                filtro.tags = {
+                    some: {
+                        tagId: tagId
+                    }
+                };
+            } else {
+                // Filtrar por nome da tag
+                filtro.tags = {
+                    some: {
+                        tag: {
+                            nome: req.query.tag
+                        }
+                    }
+                };
             }
         }
 
@@ -333,7 +383,10 @@ router.get('/posts', async (req, res, next) => {
                     id: pc.categoria.id,
                     nome: pc.categoria.translations[0]?.nome || 'Sem tradução'
                 })),
-                tags: post.tags,
+                tags: post.tags.map(pt => ({
+                    id: pt.tag.id,
+                    nome: pt.tag.nome
+                })),
                 url: `${baseUrl}/posts/${translation.urlAmigavel}`,
                 // Manter referência às traduções disponíveis
                 translationsAvailable: posts.find(p => p.id === post.id)?.translations?.map(t => t.idioma) || [lang]
@@ -354,9 +407,10 @@ router.get('/posts/id/:id', async (req, res, next) => {
         const { id } = req.params;
         const lang = req.query.lang || 'pt';
 
-        const post = await prisma.post.findUnique({
+        const post = await prisma.post.findFirst({
             where: {
-                id: parseInt(id)
+                id: parseInt(id),
+                status: 'PUBLICADO' // Apenas posts publicados
             },
             include: {
                 categorias: {
@@ -454,6 +508,11 @@ router.get('/posts/:lang/:slug', async (req, res, next) => {
         }
 
         const post = translation.post;
+        
+        // Verificar se o post está publicado (endpoint público - apenas posts PUBLICADOS)
+        if (post.status !== 'PUBLICADO') {
+            throw new NotFoundError('Post não encontrado');
+        }
         
         // Montar resposta
         const postCompleto = {
@@ -587,19 +646,39 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
         }
 
         // Atualizar categorias
-        if (categorias) {
-            await prisma.postSite.deleteMany({
+        if (categorias !== undefined && categorias !== null) {
+            // Deletar categorias existentes
+            await prisma.postCategoria.deleteMany({
                 where: { postId: parseInt(id) }
             });
             
-            const categoriasArray = JSON.parse(categorias);
-            for (const categoriaId of categoriasArray) {
-                await prisma.postSite.create({
-                    data: {
-                        postId: parseInt(id),
-                        categoriaId: parseInt(categoriaId)
+            // Adicionar novas categorias se houver
+            let categoriasArray = [];
+            if (typeof categorias === 'string') {
+                try {
+                    categoriasArray = JSON.parse(categorias);
+                } catch (e) {
+                    console.error('Erro ao fazer parse de categorias:', e);
+                    categoriasArray = [];
+                }
+            } else if (Array.isArray(categorias)) {
+                categoriasArray = categorias;
+            }
+            
+            if (categoriasArray.length > 0) {
+                for (const categoriaId of categoriasArray) {
+                    try {
+                        await prisma.postCategoria.create({
+                            data: {
+                                postId: parseInt(id),
+                                categoriaId: parseInt(categoriaId)
+                            }
+                        });
+                    } catch (error) {
+                        console.error(`Erro ao criar relacionamento categoria ${categoriaId}:`, error);
+                        // Continuar mesmo se uma categoria falhar
                     }
-                });
+                }
             }
         }
 

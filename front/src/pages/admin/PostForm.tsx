@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, X, Upload, Globe } from 'lucide-react';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Checkbox } from '@/components/ui/checkbox';
+import { TagInput } from '@/components/ui/tag-input';
 
 export default function PostForm() {
   const { id } = useParams();
@@ -49,8 +50,9 @@ export default function PostForm() {
 
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [selectedCategorias, setSelectedCategorias] = useState<number[]>([]);
-  const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [tagNames, setTagNames] = useState<string[]>([]); // Mudado para nomes de tags
   const [availableLanguages, setAvailableLanguages] = useState<string[]>(['pt']);
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
 
   // Buscar categorias (sempre em PT no admin)
   const { data: categorias } = useQuery({
@@ -58,8 +60,15 @@ export default function PostForm() {
     queryFn: () => categoriasService.getAll('pt'),
   });
 
-  // Buscar tags
-  const { data: tags } = useQuery({
+  // Buscar tags para autocomplete
+  const { data: tagSuggestions = [] } = useQuery({
+    queryKey: ['tags', 'search', tagSearchQuery],
+    queryFn: () => tagsService.search(tagSearchQuery),
+    enabled: tagSearchQuery.length > 0,
+  });
+
+  // Buscar todas as tags (para carregar tags existentes do post)
+  const { data: allTags } = useQuery({
     queryKey: ['tags'],
     queryFn: () => tagsService.getAll(),
   });
@@ -81,7 +90,8 @@ export default function PostForm() {
   useEffect(() => {
     if (post && isEdit) {
       const categoriasIds = post.categorias?.map(c => c.categoria.id) || [];
-      const tagsIds = post.tags?.map(t => t.tag.id) || [];
+      // Converter IDs de tags para nomes
+      const tagNamesFromPost = post.tags?.map(t => t.tag.nome) || [];
       
       // Idiomas disponíveis (traduções existentes)
       const langs = post.translations?.map(t => t.idioma) || ['pt'];
@@ -103,13 +113,13 @@ export default function PostForm() {
         destaque: post.destaque,
         dataPublicacao: dataFormatada,
         categorias: categoriasIds,
-        tags: tagsIds,
+        tags: [], // Não usar mais IDs aqui
         imagens: [],
         oldImages: post.imagens || [],
       });
       setPreviewImages(post.imagens || []);
       setSelectedCategorias(categoriasIds);
-      setSelectedTags(tagsIds);
+      setTagNames(tagNamesFromPost);
     }
   }, [post, isEdit]);
 
@@ -185,21 +195,32 @@ export default function PostForm() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const dataToSubmit = {
-      ...formData,
-      categorias: selectedCategorias,
-      tags: selectedTags,
-    };
+    try {
+      // Converter nomes de tags para IDs (criando tags novas se necessário)
+      const tagIds = await tagsService.resolveTagIds(tagNames);
 
-    console.log('📤 Enviando formulário com dados:', dataToSubmit);
+      const dataToSubmit = {
+        ...formData,
+        categorias: selectedCategorias || [], // Sempre enviar array, mesmo se vazio
+        tags: tagIds || [], // Sempre enviar array, mesmo se vazio
+      };
 
-    if (isEdit) {
-      updateMutation.mutate(dataToSubmit);
-    } else {
-      createMutation.mutate(dataToSubmit);
+      console.log('📤 Enviando formulário com dados:', dataToSubmit);
+
+      if (isEdit) {
+        updateMutation.mutate(dataToSubmit);
+      } else {
+        createMutation.mutate(dataToSubmit);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao processar tags',
+        description: error instanceof Error ? error.message : 'Não foi possível processar as tags.',
+      });
     }
   };
 
@@ -294,13 +315,9 @@ export default function PostForm() {
     );
   };
 
-  // Toggle tag
-  const toggleTag = (tagId: number) => {
-    setSelectedTags(prev => 
-      prev.includes(tagId)
-        ? prev.filter(id => id !== tagId)
-        : [...prev, tagId]
-    );
+  // Handler para busca de tags (autocomplete)
+  const handleTagSearch = (query: string) => {
+    setTagSearchQuery(query);
   };
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
@@ -542,24 +559,14 @@ export default function PostForm() {
             {/* Tags */}
             <div className="space-y-2">
               <Label>Tags</Label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {tags?.map((tag) => (
-                  <div key={tag.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`tag-${tag.id}`}
-                      checked={selectedTags.includes(tag.id)}
-                      onCheckedChange={() => toggleTag(tag.id)}
-                      disabled={isLoading}
-                    />
-                    <label
-                      htmlFor={`tag-${tag.id}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {tag.nome}
-                    </label>
-                  </div>
-                ))}
-              </div>
+              <TagInput
+                value={tagNames}
+                onChange={setTagNames}
+                suggestions={tagSuggestions}
+                onSearch={handleTagSearch}
+                disabled={isLoading}
+                placeholder="Digite tags separadas por vírgula (ex: música, festival, eletrônica)..."
+              />
             </div>
 
             <div className="flex gap-4 pt-4">

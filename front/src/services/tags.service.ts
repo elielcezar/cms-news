@@ -15,6 +15,62 @@ export const tagsService = {
   },
 
   /**
+   * Buscar tags por nome (para autocomplete)
+   */
+  async search(query: string): Promise<Tag[]> {
+    try {
+      const response = await apiClient.get<Tag[]>('/tags', {
+        params: { nome: query },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
+   * Buscar tag por nome ou criar se não existir
+   */
+  async createIfNotExists(nome: string): Promise<Tag> {
+    try {
+      // Buscar tag existente
+      const existingTags = await this.search(nome);
+      const exactMatch = existingTags.find(
+        (tag) => tag.nome.toLowerCase() === nome.toLowerCase()
+      );
+
+      if (exactMatch) {
+        return exactMatch;
+      }
+
+      // Criar nova tag
+      return await this.create(nome);
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
+   * Resolver múltiplas tags: buscar existentes e criar novas
+   */
+  async resolveTagIds(tagNames: string[]): Promise<number[]> {
+    try {
+      const tagIds: number[] = [];
+
+      for (const tagName of tagNames) {
+        if (!tagName.trim()) continue;
+
+        const tag = await this.createIfNotExists(tagName.trim());
+        tagIds.push(tag.id);
+      }
+
+      return tagIds;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
    * Criar nova tag
    */
   async create(nome: string): Promise<Tag> {

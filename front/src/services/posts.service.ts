@@ -102,12 +102,12 @@ export const postsService = {
       if (data.destaque !== undefined) formData.append('destaque', data.destaque.toString());
       if (data.dataPublicacao) formData.append('dataPublicacao', data.dataPublicacao);
       
-      // Adicionar categorias e tags
-      if (data.categorias && data.categorias.length > 0) {
-        formData.append('categorias', JSON.stringify(data.categorias));
+      // Adicionar categorias e tags (sempre enviar, mesmo se vazio)
+      if (data.categorias !== undefined) {
+        formData.append('categorias', JSON.stringify(data.categorias || []));
       }
-      if (data.tags && data.tags.length > 0) {
-        formData.append('tags', JSON.stringify(data.tags));
+      if (data.tags !== undefined) {
+        formData.append('tags', JSON.stringify(data.tags || []));
       }
 
       // Adicionar imagens antigas (manter)

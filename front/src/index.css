@@ -113,8 +113,12 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    font-size: 1.15rem; /* Aumenta tamanho base de todos os textos */
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground;    
   }
 
   h1, h2{
