@@ -5,11 +5,24 @@ export const categoriasService = {
   /**
    * Listar todas as categorias
    */
-  async getAll(lang: string = 'pt'): Promise<Categoria[]> {
+  async getAll(lang?: string): Promise<Categoria[]> {
     try {
+      const params = lang ? { lang } : {};
       const response = await apiClient.get<Categoria[]>('/categorias', {
-        params: { lang }
+        params
       });
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
+   * Buscar categoria por ID (com todas as traduções)
+   */
+  async getById(id: number): Promise<Categoria> {
+    try {
+      const response = await apiClient.get<Categoria>(`/categorias/${id}`);
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));

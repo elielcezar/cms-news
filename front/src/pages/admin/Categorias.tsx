@@ -23,10 +23,10 @@ export default function Categorias() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Buscar categorias (sempre em PT no admin)
+  // Buscar categorias (todas as traduções para o admin)
   const { data: categorias, isLoading } = useQuery({
-    queryKey: ['categorias', 'pt'],
-    queryFn: () => categoriasService.getAll('pt'),
+    queryKey: ['categorias', 'all'],
+    queryFn: () => categoriasService.getAll(),
   });
 
   // Mutation para deletar
@@ -51,7 +51,7 @@ export default function Categorias() {
   const filteredCategorias = (categorias || []).filter((categoria) => {
     const searchLower = searchTerm.toLowerCase();
     // Buscar em todas as traduções
-    return categoria.translations?.some((t: any) => 
+    return categoria.translations?.some((t: any) =>
       t.nome.toLowerCase().includes(searchLower)
     ) || false;
   });
@@ -122,42 +122,42 @@ export default function Categorias() {
                   const ptTranslation = categoria.translations?.find((t: any) => t.idioma === 'pt');
                   const enTranslation = categoria.translations?.find((t: any) => t.idioma === 'en');
                   const esTranslation = categoria.translations?.find((t: any) => t.idioma === 'es');
-                  
+
                   return (
-                  <TableRow key={categoria.id}>
-                    <TableCell className="font-medium">{categoria.id}</TableCell>
-                    <TableCell>
-                      {ptTranslation?.nome || <span className="text-muted-foreground italic">—</span>}
-                    </TableCell>
-                    <TableCell>
-                      {enTranslation?.nome || <span className="text-muted-foreground italic">—</span>}
-                    </TableCell>
-                    <TableCell>
-                      {esTranslation?.nome || <span className="text-muted-foreground italic">—</span>}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(categoria.createdAt).toLocaleDateString('pt-BR')}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => navigate(`/admin/categorias/${categoria.id}/editar`)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(categoria.id)}
-                          disabled={deleteCategoria.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                    <TableRow key={categoria.id}>
+                      <TableCell className="font-medium">{categoria.id}</TableCell>
+                      <TableCell>
+                        {ptTranslation?.nome || <span className="text-muted-foreground italic">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        {enTranslation?.nome || <span className="text-muted-foreground italic">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        {esTranslation?.nome || <span className="text-muted-foreground italic">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        {new Date(categoria.createdAt).toLocaleDateString('pt-BR')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/admin/categorias/${categoria.id}/editar`)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(categoria.id)}
+                            disabled={deleteCategoria.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               )}

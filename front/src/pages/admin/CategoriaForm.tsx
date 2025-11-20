@@ -23,10 +23,7 @@ export default function CategoriaForm() {
   // Buscar categoria se for edição
   const { data: categoria } = useQuery({
     queryKey: ['categoria', id],
-    queryFn: async () => {
-      const allCategorias = await categoriasService.getAll('pt');
-      return allCategorias.find(c => c.id === Number(id));
-    },
+    queryFn: () => categoriasService.getById(Number(id)),
     enabled: isEdit && !!id,
   });
 

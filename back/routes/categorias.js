@@ -53,7 +53,7 @@ router.get('/categorias', async (req, res, next) => {
         });
 
         console.log(`Categorias encontradas: ${categorias.length}`);
-        
+
         // Se solicitou idioma específico, simplificar response
         if (lang) {
             const categoriasSimplificadas = categorias.map(cat => ({
@@ -64,8 +64,29 @@ router.get('/categorias', async (req, res, next) => {
             }));
             return res.status(200).json(categoriasSimplificadas);
         }
-        
+
         res.status(200).json(categorias);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Obter categoria por ID (público ou protegido, dependendo do uso)
+router.get('/categorias/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const categoria = await prisma.categoria.findUnique({
+            where: { id: parseInt(id) },
+            include: {
+                translations: true
+            }
+        });
+
+        if (!categoria) {
+            return res.status(404).json({ message: 'Categoria não encontrada' });
+        }
+
+        res.status(200).json(categoria);
     } catch (error) {
         next(error);
     }
