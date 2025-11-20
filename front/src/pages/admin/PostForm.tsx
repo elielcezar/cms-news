@@ -52,10 +52,10 @@ export default function PostForm() {
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>(['pt']);
 
-  // Buscar categorias
+  // Buscar categorias (sempre em PT no admin)
   const { data: categorias } = useQuery({
-    queryKey: ['categorias'],
-    queryFn: () => categoriasService.getAll(),
+    queryKey: ['categorias', 'pt'],
+    queryFn: () => categoriasService.getAll('pt'),
   });
 
   // Buscar tags
@@ -203,7 +203,7 @@ export default function PostForm() {
     }
   };
 
-  const handleChange = (field: keyof PostFormData, value: any) => {
+  const handleChange = (field: keyof PostFormData, value: string | boolean | number | File[] | string[]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -227,42 +227,28 @@ export default function PostForm() {
     }
   };
 
-  // Handler para upload de imagens
+  // Handler para upload de imagem de capa
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    const newFiles = Array.from(files);
-    const currentTotal = (formData.imagens?.length || 0) + (formData.oldImages?.length || 0);
-    
-    if (currentTotal + newFiles.length > 18) {
-      toast({
-        variant: 'destructive',
-        title: 'Limite de imagens',
-        description: 'Você pode adicionar no máximo 18 imagens.',
-      });
-      return;
-    }
+    const file = files[0]; // Apenas primeira imagem
 
-    // Validar tamanho dos arquivos (10MB)
+    // Validar tamanho do arquivo (10MB)
     const maxSize = 10 * 1024 * 1024;
-    const filesTooLarge = newFiles.filter(file => file.size > maxSize);
-    
-    if (filesTooLarge.length > 0) {
+    if (file.size > maxSize) {
       toast({
         variant: 'destructive',
         title: 'Arquivo muito grande',
-        description: `${filesTooLarge.length} arquivo(s) excede(m) o limite de 10MB.`,
+        description: 'A imagem não pode exceder 10MB.',
       });
       e.target.value = '';
       return;
     }
 
-    // Validar tipos de arquivo
+    // Validar tipo de arquivo
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const invalidTypes = newFiles.filter(file => !allowedTypes.includes(file.type));
-    
-    if (invalidTypes.length > 0) {
+    if (!allowedTypes.includes(file.type)) {
       toast({
         variant: 'destructive',
         title: 'Tipo de arquivo inválido',
@@ -272,50 +258,39 @@ export default function PostForm() {
       return;
     }
 
-    // Adicionar novas imagens
+    // Substituir imagem (apenas 1)
     setFormData(prev => ({
       ...prev,
-      imagens: [...(prev.imagens || []), ...newFiles],
+      imagens: [file],
+      oldImages: [], // Limpar imagem antiga
     }));
 
-    // Criar previews
-    newFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImages(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
+    // Criar preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewImages([reader.result as string]);
+    };
+    reader.readAsDataURL(file);
 
     e.target.value = '';
   };
 
-  // Remover imagem
-  const handleRemoveImage = (index: number) => {
-    const totalOldImages = formData.oldImages?.length || 0;
-    
-    if (index < totalOldImages) {
-      setFormData(prev => ({
-        ...prev,
-        oldImages: prev.oldImages?.filter((_, i) => i !== index),
-      }));
-    } else {
-      const newIndex = index - totalOldImages;
-      setFormData(prev => ({
-        ...prev,
-        imagens: prev.imagens?.filter((_, i) => i !== newIndex),
-      }));
-    }
-
-    setPreviewImages(prev => prev.filter((_, i) => i !== index));
+  // Remover imagem de capa
+  const handleRemoveImage = () => {
+    setFormData(prev => ({
+      ...prev,
+      imagens: [],
+      oldImages: [],
+    }));
+    setPreviewImages([]);
   };
 
-  // Toggle site
+  // Toggle categoria
   const toggleCategoria = (categoriaId: number) => {
     setSelectedCategorias(prev => 
-      prev.includes(siteId)
-        ? prev.filter(id => id !== siteId)
-        : [...prev, siteId]
+      prev.includes(categoriaId)
+        ? prev.filter(id => id !== categoriaId)
+        : [...prev, categoriaId]
     );
   };
 
@@ -428,6 +403,59 @@ export default function PostForm() {
               />
             </div>
 
+            {/* Imagem de Capa */}
+            <div className="space-y-2">
+              <Label>Imagem de Capa</Label>
+              <p className="text-sm text-muted-foreground">
+                Formatos aceitos: JPEG, JPG, PNG, WEBP (máximo 10MB)
+              </p>
+              <div className="space-y-4">
+                {/* Preview da imagem */}
+                {previewImages.length > 0 && (
+                  <div className="relative w-full max-w-md">
+                    <img
+                      src={previewImages[0]}
+                      alt="Imagem de capa"
+                      className="w-full h-48 object-cover rounded-lg border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8"
+                      onClick={handleRemoveImage}
+                      disabled={isLoading}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Input de upload */}
+                {previewImages.length === 0 && (
+                  <div className="flex items-center gap-4">
+                    <Input
+                      id="imagem-capa"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      disabled={isLoading}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('imagem-capa')?.click()}
+                      disabled={isLoading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Selecionar Imagem de Capa
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="conteudo">Conteúdo *</Label>
               <RichTextEditor
@@ -488,20 +516,20 @@ export default function PostForm() {
               </div>
             </div>
 
-            {/* Sites */}
+            {/* Categorias */}
             <div className="space-y-2">
-              <Label>Sites</Label>
+              <Label>Categorias</Label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {sites?.map((site) => (
-                  <div key={site.id} className="flex items-center space-x-2">
+                {categorias?.map((categoria) => (
+                  <div key={categoria.id} className="flex items-center space-x-2">
                     <Checkbox
-                      id={`site-${site.id}`}
+                      id={`categoria-${categoria.id}`}
                       checked={selectedCategorias.includes(categoria.id)}
                       onCheckedChange={() => toggleCategoria(categoria.id)}
                       disabled={isLoading}
                     />
                     <label
-                      htmlFor={`site-${site.id}`}
+                      htmlFor={`categoria-${categoria.id}`}
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                     >
                       {categoria.nome}
@@ -531,65 +559,6 @@ export default function PostForm() {
                     </label>
                   </div>
                 ))}
-              </div>
-            </div>
-
-            {/* Upload de Imagens */}
-            <div className="space-y-2">
-              <Label>Imagens (máximo 18 arquivos, 10MB por arquivo)</Label>
-              <p className="text-sm text-muted-foreground">
-                Formatos aceitos: JPEG, JPG, PNG, WEBP
-              </p>
-              <div className="space-y-4">
-                {/* Preview de imagens */}
-                {previewImages.length > 0 && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {previewImages.map((img, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={img}
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => handleRemoveImage(index)}
-                          disabled={isLoading}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Input de upload */}
-                <div className="flex items-center gap-4">
-                  <Input
-                    id="imagens"
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageChange}
-                    disabled={isLoading || previewImages.length >= 18}
-                    className="hidden"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => document.getElementById('imagens')?.click()}
-                    disabled={isLoading || previewImages.length >= 18}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Adicionar Imagens
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    {previewImages.length} / 18 imagens
-                  </span>
-                </div>
               </div>
             </div>
 

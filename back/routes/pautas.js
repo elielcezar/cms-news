@@ -1,15 +1,12 @@
 import express from 'express';
+import https from 'https';
 import prisma from '../config/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { authenticateApiKey } from '../middleware/apiKeyAuth.js';
 import { validate, pautaCreateSchema } from '../middleware/validation.js';
-import { fetchContentWithJina, generateNewsWithAI, generateSlug } from '../services/aiService.js';
+import { fetchContentWithJina, generateNewsWithAI, generateSlug, generatePautasWithAI } from '../services/aiService.js';
 
 const router = express.Router();
-
-// Configuração do webhook N8N
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.ecwd.cloud/webhook/buscar-pautas';
-const N8N_WEBHOOK_KEY = process.env.N8N_WEBHOOK_KEY || 'IdN:{+&M^3FpYd&Q8d';
 
 /**
  * Criar pauta (endpoint para n8n - protegido por API Key)
@@ -37,34 +34,63 @@ router.post('/pautas', authenticateApiKey, validate(pautaCreateSchema), async (r
 });
 
 /**
- * Disparar busca de pautas via N8N (protegido por JWT)
+ * Disparar busca de pautas via IA (protegido por JWT)
  * POST /api/pautas/gerar
  */
 router.post('/pautas/gerar', authenticateToken, async (req, res, next) => {
     try {
-        console.log('🔍 Disparando busca de pautas via N8N...');
+        console.log('🔍 Iniciando busca de pautas com IA...');
 
-        // Chamar webhook do N8N
-        const response = await fetch(N8N_WEBHOOK_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': N8N_WEBHOOK_KEY
-            }
+        // Buscar todas as fontes cadastradas
+        const fontes = await prisma.fonte.findMany({
+            orderBy: { titulo: 'asc' }
         });
 
-        if (!response.ok) {
-            throw new Error(`N8N retornou erro: ${response.status}`);
+        if (fontes.length === 0) {
+            return res.status(400).json({ 
+                error: 'Nenhuma fonte cadastrada. Cadastre fontes antes de gerar pautas.' 
+            });
         }
 
-        console.log('✅ Webhook do N8N disparado com sucesso!');
+        console.log(`📚 ${fontes.length} fontes encontradas`);
+
+        // Gerar pautas com IA
+        const pautasSugeridas = await generatePautasWithAI(fontes);
+
+        if (pautasSugeridas.length === 0) {
+            return res.status(200).json({ 
+                message: 'Nenhuma pauta relevante encontrada nos últimos dias.',
+                pautasCriadas: 0
+            });
+        }
+
+        // Salvar pautas no banco
+        let pautasCriadas = 0;
+        for (const pautaSugerida of pautasSugeridas) {
+            try {
+                await prisma.pauta.create({
+                    data: {
+                        assunto: pautaSugerida.assunto,
+                        resumo: pautaSugerida.resumo,
+                        fontes: pautaSugerida.fontes,
+                    }
+                });
+                pautasCriadas++;
+                console.log(`✅ Pauta criada: ${pautaSugerida.assunto}`);
+            } catch (error) {
+                console.error(`❌ Erro ao salvar pauta:`, error.message);
+            }
+        }
+
+        console.log(`✅ ${pautasCriadas} pautas criadas com sucesso!`);
         
         res.status(200).json({ 
-            message: 'Busca de pautas iniciada com sucesso! Aguarde alguns segundos e atualize a lista.',
-            status: 'processing'
+            message: `${pautasCriadas} novas sugestões de pauta foram criadas com sucesso!`,
+            pautasCriadas: pautasCriadas,
+            status: 'completed'
         });
     } catch (error) {
-        console.error('❌ Erro ao disparar busca de pautas:', error);
+        console.error('❌ Erro ao gerar pautas:', error);
         next(error);
     }
 });

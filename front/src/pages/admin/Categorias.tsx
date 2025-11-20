@@ -23,10 +23,10 @@ export default function Categorias() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Buscar categorias
+  // Buscar categorias (sempre em PT no admin)
   const { data: categorias, isLoading } = useQuery({
-    queryKey: ['categorias'],
-    queryFn: () => categoriasService.getAll(),
+    queryKey: ['categorias', 'pt'],
+    queryFn: () => categoriasService.getAll('pt'),
   });
 
   // Mutation para deletar

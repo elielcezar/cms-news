@@ -24,7 +24,7 @@ export default function CategoriaForm() {
   const { data: categoria } = useQuery({
     queryKey: ['categoria', id],
     queryFn: async () => {
-      const allCategorias = await categoriasService.getAll();
+      const allCategorias = await categoriasService.getAll('pt');
       return allCategorias.find(c => c.id === Number(id));
     },
     enabled: isEdit && !!id,

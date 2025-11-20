@@ -57,9 +57,9 @@ export const postsService = {
       if (data.destaque !== undefined) formData.append('destaque', data.destaque.toString());
       if (data.dataPublicacao) formData.append('dataPublicacao', data.dataPublicacao);
       
-      // Adicionar sites e tags como JSON
-      if (data.sites && data.sites.length > 0) {
-        formData.append('sites', JSON.stringify(data.sites));
+      // Adicionar categorias e tags como JSON
+      if (data.categorias && data.categorias.length > 0) {
+        formData.append('categorias', JSON.stringify(data.categorias));
       }
       if (data.tags && data.tags.length > 0) {
         formData.append('tags', JSON.stringify(data.tags));
@@ -102,9 +102,9 @@ export const postsService = {
       if (data.destaque !== undefined) formData.append('destaque', data.destaque.toString());
       if (data.dataPublicacao) formData.append('dataPublicacao', data.dataPublicacao);
       
-      // Adicionar sites e tags
-      if (data.sites && data.sites.length > 0) {
-        formData.append('sites', JSON.stringify(data.sites));
+      // Adicionar categorias e tags
+      if (data.categorias && data.categorias.length > 0) {
+        formData.append('categorias', JSON.stringify(data.categorias));
       }
       if (data.tags && data.tags.length > 0) {
         formData.append('tags', JSON.stringify(data.tags));

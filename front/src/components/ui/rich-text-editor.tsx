@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
+import TextAlign from '@tiptap/extension-text-align';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Bold,
   Italic,
@@ -14,6 +16,12 @@ import {
   Redo,
   ImageIcon,
   Loader2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Code,
+  Code2,
+  FileCode,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +37,8 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const uploadingRef = useRef(false);
+  const [isHtmlMode, setIsHtmlMode] = useState(false);
+  const [htmlContent, setHtmlContent] = useState(content);
 
   const editor = useEditor({
     extensions: [
@@ -39,6 +49,9 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
         HTMLAttributes: {
           class: 'rounded-lg max-w-full h-auto my-4',
         },
+      }),
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
       }),
     ],
     content,
@@ -62,8 +75,31 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
     
     if (normalizedNew !== normalizedCurrent) {
       editor.commands.setContent(content || '');
+      setHtmlContent(content || '');
     }
   }, [content, editor]);
+
+  // Alternar entre modo visual e HTML
+  const toggleHtmlMode = () => {
+    if (!editor) return;
+
+    if (isHtmlMode) {
+      // Voltando para modo visual: aplicar HTML editado
+      editor.commands.setContent(htmlContent);
+      onChange(htmlContent);
+    } else {
+      // Indo para modo HTML: pegar HTML atual
+      setHtmlContent(editor.getHTML());
+    }
+    
+    setIsHtmlMode(!isHtmlMode);
+  };
+
+  // Atualizar HTML enquanto edita no modo HTML
+  const handleHtmlChange = (value: string) => {
+    setHtmlContent(value);
+    onChange(value);
+  };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -143,8 +179,20 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           type="button"
           variant="ghost"
           size="sm"
+          onClick={toggleHtmlMode}
+          className={isHtmlMode ? 'bg-accent' : ''}
+          title={isHtmlMode ? 'Modo Visual' : 'Editar HTML'}
+        >
+          <FileCode className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={editor.isActive('bold') ? 'bg-accent' : ''}
+          disabled={isHtmlMode}
         >
           <Bold className="h-4 w-4" />
         </Button>
@@ -154,6 +202,7 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           size="sm"
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={editor.isActive('italic') ? 'bg-accent' : ''}
+          disabled={isHtmlMode}
         >
           <Italic className="h-4 w-4" />
         </Button>
@@ -163,6 +212,7 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           size="sm"
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           className={editor.isActive('heading', { level: 2 }) ? 'bg-accent' : ''}
+          disabled={isHtmlMode}
         >
           <Heading2 className="h-4 w-4" />
         </Button>
@@ -172,6 +222,7 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           size="sm"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           className={editor.isActive('bulletList') ? 'bg-accent' : ''}
+          disabled={isHtmlMode}
         >
           <List className="h-4 w-4" />
         </Button>
@@ -181,6 +232,7 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           size="sm"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           className={editor.isActive('orderedList') ? 'bg-accent' : ''}
+          disabled={isHtmlMode}
         >
           <ListOrdered className="h-4 w-4" />
         </Button>
@@ -190,6 +242,7 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           size="sm"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           className={editor.isActive('blockquote') ? 'bg-accent' : ''}
+          disabled={isHtmlMode}
         >
           <Quote className="h-4 w-4" />
         </Button>
@@ -198,8 +251,65 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           type="button"
           variant="ghost"
           size="sm"
+          onClick={() => editor.chain().focus().setTextAlign('left').run()}
+          className={editor.isActive({ textAlign: 'left' }) ? 'bg-accent' : ''}
+          title="Alinhar à esquerda"
+          disabled={isHtmlMode}
+        >
+          <AlignLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().setTextAlign('center').run()}
+          className={editor.isActive({ textAlign: 'center' }) ? 'bg-accent' : ''}
+          title="Centralizar"
+          disabled={isHtmlMode}
+        >
+          <AlignCenter className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().setTextAlign('right').run()}
+          className={editor.isActive({ textAlign: 'right' }) ? 'bg-accent' : ''}
+          title="Alinhar à direita"
+          disabled={isHtmlMode}
+        >
+          <AlignRight className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleCode().run()}
+          className={editor.isActive('code') ? 'bg-accent' : ''}
+          title="Código inline"
+          disabled={isHtmlMode}
+        >
+          <Code className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          className={editor.isActive('codeBlock') ? 'bg-accent' : ''}
+          title="Bloco de código"
+          disabled={isHtmlMode}
+        >
+          <Code2 className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploadingRef.current}
+          disabled={uploadingRef.current || isHtmlMode}
           title="Inserir imagem"
         >
           {uploadingRef.current ? (
@@ -221,7 +331,7 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().undo().run()}
-          disabled={!editor.can().undo()}
+          disabled={!editor.can().undo() || isHtmlMode}
         >
           <Undo className="h-4 w-4" />
         </Button>
@@ -230,12 +340,22 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().redo().run()}
-          disabled={!editor.can().redo()}
+          disabled={!editor.can().redo() || isHtmlMode}
         >
           <Redo className="h-4 w-4" />
         </Button>
       </div>
-      <EditorContent editor={editor} className="bg-background" />
+      
+      {isHtmlMode ? (
+        <Textarea
+          value={htmlContent}
+          onChange={(e) => handleHtmlChange(e.target.value)}
+          className="min-h-[300px] font-mono text-sm p-3 resize-none rounded-t-none border-0 focus-visible:ring-0"
+          placeholder="Cole aqui o HTML (ex: iframe do YouTube, Instagram, etc.)"
+        />
+      ) : (
+        <EditorContent editor={editor} className="bg-background" />
+      )}
     </div>
   );
 }

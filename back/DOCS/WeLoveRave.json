@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "url": "https://cms.ecwd.cloud/api/fontes/site/1",
+        "url": "https://cms.ecwd.cloud/api/fontes",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {}
@@ -106,23 +106,6 @@
     },
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {}
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        -560,
-        -16
-      ],
-      "id": "ba0fffde-a410-4c5f-be96-456952866da6",
-      "name": "Schedule Trigger"
-    },
-    {
-      "parameters": {
         "url": "={{ $json.jinaUrl }}",
         "options": {}
       },
@@ -171,6 +154,29 @@
         "openAiApi": {
           "id": "IPoAsfUMWnt6O4fz",
           "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "buscar-pautas",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -576,
+        -16
+      ],
+      "id": "d8887499-333a-4552-94b5-1a9dd6071bbd",
+      "name": "Webhook",
+      "webhookId": "143e1418-4a4e-4577-9d6f-b735814a432d",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "feJbdX9cMvgfZMGR",
+          "name": "Header Auth account"
         }
       }
     }
@@ -232,17 +238,6 @@
         ]
       ]
     },
-    "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Busca o conteúdo das Paginas": {
       "main": [
         [
@@ -275,13 +270,24 @@
           }
         ]
       ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "5dc419ab-3d01-48cc-88a2-d09d60dcc6d8",
+  "versionId": "305e37f7-f992-479d-ad92-d141e97dff48",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "55110b778948b706095654571ea1560fc31d8aad607c2efb5268271243268daf"

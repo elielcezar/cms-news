@@ -228,3 +228,153 @@ export function generateSlug(text) {
     .replace(/(^-|-$)/g, '');
 }
 
+/**
+ * Gera sugestões de pauta usando IA
+ * Busca fontes, extrai conteúdo e usa OpenAI para sugerir pautas
+ * @param {Array} fontes - Array de fontes {titulo, url}
+ * @returns {Promise<Array>} - Array de pautas sugeridas
+ */
+export async function generatePautasWithAI(fontes) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY não configurada no .env');
+  }
+
+  console.log(`📋 Processando ${fontes.length} fontes...`);
+
+  // Buscar conteúdo de todas as fontes usando Jina AI
+  const conteudosPromises = fontes.map(fonte => 
+    fetchContentWithJina(fonte.url)
+      .then(conteudo => ({
+        titulo: fonte.titulo,
+        url: fonte.url,
+        conteudo: conteudo.substring(0, 5000) // Limitar tamanho
+      }))
+      .catch(err => {
+        console.warn(`⚠️ Erro ao buscar ${fonte.url}:`, err.message);
+        return null;
+      })
+  );
+
+  const conteudos = (await Promise.all(conteudosPromises)).filter(c => c !== null);
+
+  if (conteudos.length === 0) {
+    throw new Error('Não foi possível obter conteúdo de nenhuma fonte');
+  }
+
+  console.log(`✅ ${conteudos.length} conteúdos obtidos com sucesso`);
+
+  // Montar prompt para OpenAI
+  const conteudosTexto = conteudos.map((item, i) => 
+    `## Fonte ${i+1}: ${item.titulo}\nURL: ${item.url}\n\n${item.conteudo}\n\n---\n`
+  ).join('');
+
+  const prompt = `Você é um editor de notícias especializado em música eletrônica.
+
+Analise os seguintes conteúdos de sites de notícias e gere sugestões de pauta para os últimos 7 dias.
+
+CONTEÚDOS:
+${conteudosTexto}
+
+INSTRUÇÕES:
+- Identifique notícias interessantes dos últimos 7 dias
+- Para cada sugestão de pauta, forneça:
+  - Assunto (título curto e chamativo)
+  - Resumo (2-3 frases explicando a notícia)
+  - Fontes (lista com nome e URL de onde veio a informação)
+
+FORMATO DE RESPOSTA (JSON):
+{
+  "pautas": [
+    {
+      "assunto": "Grammy 2026: Skrillex concorre em 2 categorias",
+      "resumo": "Foram divulgados os indicados do Grammy 2026. Skrillex está presente em duas categorias de música eletrônica.",
+      "fontes": [
+        {"nome": "House Mag", "url": "https://housemag.com.br/..."},
+        {"nome": "Mixmag Brasil", "url": "https://mixmag.com.br/..."}
+      ]
+    }
+  ]
+}
+
+IMPORTANTE: Retorne APENAS o JSON, sem texto adicional.`;
+
+  // Chamar OpenAI
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é um editor de notícias especializado. Sempre responda em JSON válido.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 2000
+    });
+
+    const options = {
+      hostname: 'api.openai.com',
+      port: 443,
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    console.log('🤖 Chamando OpenAI para gerar sugestões de pauta...');
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          if (res.statusCode !== 200) {
+            console.error('❌ OpenAI error:', data);
+            reject(new Error(`OpenAI retornou status ${res.statusCode}`));
+            return;
+          }
+
+          const response = JSON.parse(data);
+          const content = response.choices[0].message.content;
+
+          // Remove marcadores de código markdown se houver
+          let jsonString = content
+            .replace(/```json\n?/g, '')
+            .replace(/```\n?/g, '')
+            .trim();
+
+          const resultado = JSON.parse(jsonString);
+          const pautas = resultado.pautas || [];
+
+          console.log(`✅ ${pautas.length} pautas sugeridas pela IA`);
+          resolve(pautas);
+        } catch (error) {
+          console.error('❌ Erro ao parsear resposta da IA:', error);
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('❌ Erro na requisição OpenAI:', error);
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
