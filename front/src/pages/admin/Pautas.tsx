@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pautasService } from '@/services/pautas.service';
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, Trash2, Loader2, FileEdit, ExternalLink, Search, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,6 +31,8 @@ export default function Pautas() {
   const [selectedPauta, setSelectedPauta] = useState<Pauta | null>(null);
   const [convertingPautaId, setConvertingPautaId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const selectAllCheckboxRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -54,6 +57,29 @@ export default function Pautas() {
       toast({
         variant: 'destructive',
         title: 'Erro ao excluir pauta',
+        description: error.message,
+      });
+    },
+  });
+
+  // Mutation para deletar múltiplas pautas
+  const deleteMultiplePautas = useMutation({
+    mutationFn: async (ids: number[]) => {
+      // Deletar todas as pautas em paralelo
+      await Promise.all(ids.map(id => pautasService.delete(id)));
+    },
+    onSuccess: (_, ids) => {
+      setSelectedIds(new Set()); // Limpar seleção
+      queryClient.invalidateQueries({ queryKey: ['pautas'] });
+      toast({
+        title: 'Pautas excluídas',
+        description: `${ids.length} sugestão(ões) de pauta foram excluídas com sucesso.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir pautas',
         description: error.message,
       });
     },
@@ -117,6 +143,62 @@ export default function Pautas() {
     }
   };
 
+  const filteredPautas = (pautas || []).filter((pauta) => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      pauta.assunto.toLowerCase().includes(searchLower) ||
+      pauta.resumo.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      // Selecionar todas as pautas filtradas
+      const allIds = new Set(filteredPautas.map(p => p.id));
+      setSelectedIds(allIds);
+    } else {
+      // Desmarcar todas
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectPauta = (id: number, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleDeleteSelected = () => {
+    const idsArray = Array.from(selectedIds);
+    if (idsArray.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Nenhuma pauta selecionada',
+        description: 'Selecione pelo menos uma pauta para excluir.',
+      });
+      return;
+    }
+
+    if (confirm(`Tem certeza que deseja excluir ${idsArray.length} sugestão(ões) de pauta?`)) {
+      deleteMultiplePautas.mutate(idsArray);
+    }
+  };
+
+  const isAllSelected = filteredPautas.length > 0 && selectedIds.size === filteredPautas.length;
+  const isIndeterminate = selectedIds.size > 0 && selectedIds.size < filteredPautas.length;
+
+  // Atualizar estado indeterminado do checkbox
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate = isIndeterminate;
+    }
+  }, [isIndeterminate]);
+
   const handleViewDetails = (pauta: Pauta) => {
     setSelectedPauta(pauta);
     setIsDialogOpen(true);
@@ -139,15 +221,6 @@ export default function Pautas() {
 
     convertToPost.mutate(pautaId);
   };
-
-  const filteredPautas = (pautas || []).filter((pauta) => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      pauta.assunto.toLowerCase().includes(searchLower) ||
-      pauta.resumo.toLowerCase().includes(searchLower)
-    );
-  });
 
   // Helper para truncar texto
   const truncate = (text: string, maxLength: number): string => {
@@ -205,12 +278,39 @@ export default function Pautas() {
 
       <Card className="mb-4">
         <CardContent className="pt-6">
-          <Input
-            placeholder="Buscar por assunto ou resumo..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-md"
-          />
+          <div className="flex items-center gap-4">
+            <Input
+              placeholder="Buscar por assunto ou resumo..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-md"
+            />
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-sm">
+                  {selectedIds.size} selecionada(s)
+                </Badge>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteSelected}
+                  disabled={deleteMultiplePautas.isPending}
+                >
+                  {deleteMultiplePautas.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Excluindo...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir Selecionadas
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -222,6 +322,13 @@ export default function Pautas() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    ref={selectAllCheckboxRef}
+                    checked={isAllSelected}
+                    onCheckedChange={handleSelectAll}
+                  />
+                </TableHead>
                 <TableHead className="w-[60px]">ID</TableHead>
                 <TableHead>Assunto</TableHead>
                 <TableHead>Resumo</TableHead>
@@ -232,19 +339,28 @@ export default function Pautas() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : filteredPautas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     {searchTerm ? 'Nenhuma pauta encontrada' : 'Nenhuma sugestão de pauta ainda'}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredPautas.map((pauta) => (
-                  <TableRow key={pauta.id} className={!pauta.lida ? 'font-semibold' : ''}>
+                  <TableRow 
+                    key={pauta.id} 
+                    className={!pauta.lida ? 'font-semibold' : ''}
+                  >
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(pauta.id)}
+                        onCheckedChange={(checked) => handleSelectPauta(pauta.id, checked as boolean)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{pauta.id}</TableCell>
                     <TableCell className={!pauta.lida ? 'font-bold' : ''}>
                       <div className="flex items-center gap-2">
@@ -291,7 +407,7 @@ export default function Pautas() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(pauta.id)}
-                          disabled={deletePauta.isPending}
+                          disabled={deletePauta.isPending || deleteMultiplePautas.isPending}
                           title="Excluir"
                         >
                           <Trash2 className="h-4 w-4" />

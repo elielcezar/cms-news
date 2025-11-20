@@ -126,10 +126,27 @@ export default function Posts() {
 
   // Helper para pegar tags
   const getTagsNames = (post: Post): string => {
-    if (post.tags && post.tags.length > 0) {
-      return post.tags.map(t => t.tag.nome).join(', ');
+    if (!post.tags || post.tags.length === 0) {
+      return 'Sem tags';
     }
-    return 'Sem tags';
+    
+    // A API pode retornar tags em dois formatos:
+    // 1. { id, tag: { nome } } - formato completo do Prisma
+    // 2. { id, nome } - formato simplificado da API pública
+    return post.tags
+      .map(t => {
+        // Verificar se é formato simplificado { id, nome }
+        if ('nome' in t && typeof t.nome === 'string') {
+          return t.nome;
+        }
+        // Verificar se é formato completo { id, tag: { nome } }
+        if ('tag' in t && t.tag && 'nome' in t.tag) {
+          return t.tag.nome;
+        }
+        return null;
+      })
+      .filter((nome): nome is string => nome !== null)
+      .join(', ') || 'Sem tags';
   };
 
   return (

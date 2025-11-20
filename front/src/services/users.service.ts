@@ -8,7 +8,8 @@ export const usersService = {
   async getAll(): Promise<User[]> {
     try {
       const response = await apiClient.get<User[]>('/usuarios');
-      return response.data;
+      // Garantir que retornamos um array
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       throw new Error(handleApiError(error));
     }

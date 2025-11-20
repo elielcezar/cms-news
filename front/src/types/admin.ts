@@ -74,7 +74,8 @@ export interface Post {
   }[];
   tags?: {
     id: number;
-    tag: Tag;
+    tag?: Tag; // Formato completo do Prisma
+    nome?: string; // Formato simplificado da API pública
   }[];
   translations?: PostTranslation[];
   // Campos de tradução no nível raiz (quando retornado pela API com ?lang)

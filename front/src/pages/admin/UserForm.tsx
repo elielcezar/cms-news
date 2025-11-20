@@ -22,9 +22,10 @@ export default function UserForm() {
     email: '',
     password: '',
   });
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Buscar usuário se for edição
-  const { data: user } = useQuery({
+  const { data: user, isLoading: isLoadingUser } = useQuery({
     queryKey: ['user', id],
     queryFn: () => usersService.getById(Number(id)),
     enabled: isEdit && !!id,
@@ -37,6 +38,7 @@ export default function UserForm() {
         email: user.email,
         password: '', // Não carregar senha
       });
+      setConfirmPassword('');
     }
   }, [user, isEdit]);
 
@@ -85,6 +87,27 @@ export default function UserForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validar confirmação de senha se estiver preenchida
+    if (formData.password) {
+      if (formData.password.length < 6) {
+        toast({
+          variant: 'destructive',
+          title: 'Senha inválida',
+          description: 'A senha deve ter no mínimo 6 caracteres.',
+        });
+        return;
+      }
+
+      if (formData.password !== confirmPassword) {
+        toast({
+          variant: 'destructive',
+          title: 'Senhas não coincidem',
+          description: 'As senhas digitadas não são iguais.',
+        });
+        return;
+      }
+    }
+
     if (isEdit) {
       // Se editando e senha vazia, não enviar senha
       const dataToSend: Partial<UserFormData> = {
@@ -98,6 +121,16 @@ export default function UserForm() {
 
       updateMutation.mutate(dataToSend);
     } else {
+      // Na criação, senha é obrigatória
+      if (!formData.password || formData.password.length < 6) {
+        toast({
+          variant: 'destructive',
+          title: 'Senha obrigatória',
+          description: 'A senha deve ter no mínimo 6 caracteres.',
+        });
+        return;
+      }
+
       createMutation.mutate(formData);
     }
   };
@@ -138,7 +171,7 @@ export default function UserForm() {
                   value={formData.name}
                   onChange={(e) => handleChange('name', e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || isLoadingUser}
                 />
               </div>
 
@@ -150,37 +183,55 @@ export default function UserForm() {
                   value={formData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || isLoadingUser}
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">
-                Senha {isEdit ? '(deixe em branco para não alterar)' : '*'}
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => handleChange('password', e.target.value)}
-                required={!isEdit}
-                disabled={isLoading}
-                placeholder={isEdit ? 'Digite apenas se quiser alterar' : 'Mínimo 6 caracteres'}
-                minLength={6}
-              />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="password">
+                  Senha {isEdit ? '(deixe em branco para não alterar)' : '*'}
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => handleChange('password', e.target.value)}
+                  required={!isEdit}
+                  disabled={isLoading || isLoadingUser}
+                  placeholder={isEdit ? 'Digite apenas se quiser alterar' : 'Mínimo 6 caracteres'}
+                  minLength={6}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">
+                  Confirmar Senha {isEdit ? '(deixe em branco para não alterar)' : '*'}
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required={!isEdit}
+                  disabled={isLoading || isLoadingUser}
+                  placeholder={isEdit ? 'Digite apenas se quiser alterar' : 'Confirme a senha'}
+                  minLength={6}
+                />
+              </div>
             </div>
 
             <div className="flex gap-4 pt-4">
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={isLoading || isLoadingUser}>
+                {(isLoading || isLoadingUser) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isEdit ? 'Salvar Alterações' : 'Criar Usuário'}
               </Button>
               <Button 
                 type="button" 
                 variant="outline" 
                 onClick={() => navigate('/admin/usuarios')}
-                disabled={isLoading}
+                disabled={isLoading || isLoadingUser}
               >
                 Cancelar
               </Button>

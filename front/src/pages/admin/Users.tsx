@@ -21,7 +21,7 @@ export default function Users() {
   const queryClient = useQueryClient();
 
   // Buscar usuários
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, error } = useQuery({
     queryKey: ['users'],
     queryFn: () => usersService.getAll(),
   });
@@ -87,10 +87,23 @@ export default function Users() {
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-destructive">
+                    Erro ao carregar usuários: {error instanceof Error ? error.message : 'Erro desconhecido'}
+                  </TableCell>
+                </TableRow>
               ) : !users || users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
-                    Nenhum usuário cadastrado
+                  <TableCell colSpan={4} className="text-center py-8">
+                    <div className="flex flex-col items-center gap-2">
+                      <p className="text-muted-foreground text-lg font-medium">
+                        Nenhum usuário cadastrado
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Clique em "Novo Usuário" para adicionar o primeiro usuário ao sistema
+                      </p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (

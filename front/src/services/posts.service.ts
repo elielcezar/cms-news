@@ -3,11 +3,12 @@ import { Post, PostFormData, TranslationFormData } from '@/types/admin';
 
 export const postsService = {
   /**
-   * Listar todos os posts
+   * Listar todos os posts (admin - retorna todos os status)
    */
   async getAll(filters?: { site?: string; tag?: string; status?: string; lang?: string }): Promise<Post[]> {
     try {
-      const response = await apiClient.get<Post[]>('/posts', { params: filters });
+      // Usar endpoint admin que retorna todos os posts
+      const response = await apiClient.get<Post[]>('/admin/posts', { params: filters });
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));

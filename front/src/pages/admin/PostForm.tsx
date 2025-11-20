@@ -91,7 +91,16 @@ export default function PostForm() {
     if (post && isEdit) {
       const categoriasIds = post.categorias?.map(c => c.categoria.id) || [];
       // Converter IDs de tags para nomes
-      const tagNamesFromPost = post.tags?.map(t => t.tag.nome) || [];
+      const tagNamesFromPost = post.tags?.map(t => {
+        // Suportar ambos os formatos: { id, tag: { nome } } ou { id, nome }
+        if ('nome' in t && typeof t.nome === 'string') {
+          return t.nome;
+        }
+        if ('tag' in t && t.tag && 'nome' in t.tag) {
+          return t.tag.nome;
+        }
+        return '';
+      }).filter(Boolean) || [];
       
       // Idiomas disponíveis (traduções existentes)
       const langs = post.translations?.map(t => t.idioma) || ['pt'];

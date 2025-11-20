@@ -242,6 +242,168 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
     }
 })
 
+// Listar posts para admin (protegido - retorna todos os posts)
+router.get('/admin/posts', authenticateToken, async (req, res, next) => {
+    try {
+        console.log('Recebendo requisição GET /admin/posts (ADMIN)');
+        console.log('Query params:', req.query);
+
+        // Idioma solicitado (default: pt)
+        const lang = req.query.lang || 'pt';
+
+        // Criar objeto de filtro (SEM filtro de status - retorna todos)
+        const filtro = {};
+        
+        // Filtro por status (opcional para admin)
+        if (req.query.status) {
+            filtro.status = req.query.status;
+        }
+        
+        // Filtro por destaque/featured
+        const destaqueValue = req.query.featured || req.query.destaque;
+        if (destaqueValue) filtro.destaque = destaqueValue === 'true';
+        
+        // Filtro por categoria
+        const categoriaValue = req.query.category || req.query.categoria;
+        if (categoriaValue) {
+            const categoriaId = parseInt(categoriaValue);
+            if (!isNaN(categoriaId)) {
+                filtro.categorias = {
+                    some: {
+                        categoriaId: categoriaId
+                    }
+                };
+            } else {
+                filtro.categorias = {
+                    some: {
+                        categoria: {
+                            translations: {
+                                some: {
+                                    nome: categoriaValue,
+                                    idioma: lang
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+        }
+        
+        // Filtro por tag
+        if (req.query.tag) {
+            const tagId = parseInt(req.query.tag);
+            if (!isNaN(tagId)) {
+                filtro.tags = {
+                    some: {
+                        tagId: tagId
+                    }
+                };
+            } else {
+                filtro.tags = {
+                    some: {
+                        tag: {
+                            nome: req.query.tag
+                        }
+                    }
+                };
+            }
+        }
+
+        const posts = await prisma.post.findMany({
+            where: filtro,
+            include: {
+                categorias: {
+                    include: {
+                        categoria: {
+                            include: {
+                                translations: {
+                                    where: { idioma: lang }
+                                }
+                            }
+                        }
+                    }
+                },
+                tags: {
+                    include: {
+                        tag: true
+                    }
+                },
+                translations: {
+                    where: {
+                        idioma: lang
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc' // Ordenar por data de criação (mais recentes primeiro)
+            }
+        });
+
+        // Transformar posts para incluir dados da tradução no nível raiz
+        const postsCompleto = posts.map(post => {
+            const translation = post.translations[0]; // Pega a tradução do idioma solicitado
+            
+            // Para admin, retornar mesmo sem tradução (mas marcar)
+            if (!translation) {
+                console.warn(`⚠️  Post #${post.id} não tem tradução em ${lang}`);
+                return {
+                    id: post.id,
+                    titulo: `[Sem tradução em ${lang}]`,
+                    chamada: '',
+                    conteudo: '',
+                    urlAmigavel: '',
+                    imagens: post.imagens,
+                    status: post.status,
+                    destaque: post.destaque,
+                    dataPublicacao: post.dataPublicacao,
+                    idiomaDefault: post.idiomaDefault,
+                    createdAt: post.createdAt,
+                    updatedAt: post.updatedAt,
+                    categorias: post.categorias.map(pc => ({
+                        id: pc.categoria.id,
+                        nome: pc.categoria.translations[0]?.nome || 'Sem tradução'
+                    })),
+                    tags: post.tags.map(pt => ({
+                        id: pt.tag.id,
+                        nome: pt.tag.nome
+                    })),
+                    translationsAvailable: post.translations?.map(t => t.idioma) || []
+                };
+            }
+
+            return {
+                id: post.id,
+                titulo: translation.titulo,
+                chamada: translation.chamada,
+                conteudo: translation.conteudo,
+                urlAmigavel: translation.urlAmigavel,
+                imagens: post.imagens,
+                status: post.status,
+                destaque: post.destaque,
+                dataPublicacao: post.dataPublicacao,
+                idiomaDefault: post.idiomaDefault,
+                createdAt: post.createdAt,
+                updatedAt: post.updatedAt,
+                categorias: post.categorias.map(pc => ({
+                    id: pc.categoria.id,
+                    nome: pc.categoria.translations[0]?.nome || 'Sem tradução'
+                })),
+                tags: post.tags.map(pt => ({
+                    id: pt.tag.id,
+                    nome: pt.tag.nome
+                })),
+                translationsAvailable: post.translations?.map(t => t.idioma) || [lang]
+            };
+        });
+
+        console.log(`✅ Posts encontrados (ADMIN): ${postsCompleto.length} (idioma: ${lang})`);
+        res.status(200).json(postsCompleto);
+        
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Listar posts (público)
 router.get('/posts', async (req, res, next) => {
     try {
