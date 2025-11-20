@@ -22,15 +22,35 @@ import {
   Code,
   Code2,
   FileCode,
+  Video,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import apiClient from '@/lib/api-client';
+import { RawEmbed } from './tiptap-extensions/raw-embed';
+import { loadPlatformScripts } from './tiptap-extensions/embed-utils';
+import { UniversalEmbedDialog } from './universal-embed-dialog';
 
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   className?: string;
+}
+
+// Tipagem para scripts de embed
+declare global {
+  interface Window {
+    instgrm?: {
+      Embeds: {
+        process: () => void;
+      };
+    };
+    tiktokEmbed?: {
+      lib: {
+        render: () => void;
+      };
+    };
+  }
 }
 
 export function RichTextEditor({ content, onChange, className }: RichTextEditorProps) {
@@ -39,6 +59,7 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
   const uploadingRef = useRef(false);
   const [isHtmlMode, setIsHtmlMode] = useState(false);
   const [htmlContent, setHtmlContent] = useState(content);
+  const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -52,6 +73,9 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
       }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
+      }),
+      RawEmbed.configure({
+        inline: false,
       }),
     ],
     content,
@@ -166,6 +190,32 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
         fileInputRef.current.value = '';
       }
     }
+  };
+
+  // Handler para inserir embed genérico
+  const handleInsertEmbed = (html: string, platform: string) => {
+    if (!editor) return;
+    
+    editor.chain().focus().setRawEmbed({ html, platform }).run();
+    
+    // Carregar scripts necessários para a plataforma
+    loadPlatformScripts(platform);
+    
+    const platformNames: Record<string, string> = {
+      youtube: 'YouTube',
+      tiktok: 'TikTok',
+      instagram: 'Instagram',
+      spotify: 'Spotify',
+      soundcloud: 'SoundCloud',
+      generic: 'Embed',
+    };
+    
+    toast({
+      title: `${platformNames[platform] || 'Embed'} inserido!`,
+      description: platform === 'instagram' 
+        ? 'Nota: Embeds do Instagram podem não aparecer em localhost.'
+        : 'O embed foi adicionado ao conteúdo.',
+    });
   };
 
   if (!editor) {
@@ -330,6 +380,17 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
           type="button"
           variant="ghost"
           size="sm"
+          onClick={() => setEmbedDialogOpen(true)}
+          disabled={isHtmlMode}
+          title="Inserir Embed (YouTube, TikTok, Instagram, Spotify...)"
+        >
+          <Video className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo() || isHtmlMode}
         >
@@ -356,6 +417,12 @@ export function RichTextEditor({ content, onChange, className }: RichTextEditorP
       ) : (
         <EditorContent editor={editor} className="bg-background" />
       )}
+
+      <UniversalEmbedDialog
+        open={embedDialogOpen}
+        onOpenChange={setEmbedDialogOpen}
+        onInsert={handleInsertEmbed}
+      />
     </div>
   );
 }

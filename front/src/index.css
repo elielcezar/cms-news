@@ -121,3 +121,117 @@ All colors MUST be HSL.
     @apply text-primary;
   }
 }
+
+/* Estilos para embeds responsivos genéricos */
+@layer components {
+  /* Container genérico de embed */
+  .embed-container {
+    margin: 1.5rem auto;
+    max-width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .embed-content {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Estilos específicos por plataforma */
+  
+  /* YouTube */
+  .embed-youtube iframe {
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border-radius: 0.5rem;
+  }
+
+  /* TikTok */
+  .embed-tiktok {
+    max-width: 605px;
+  }
+
+  .embed-tiktok blockquote.tiktok-embed {
+    margin: 0 auto !important;
+    min-width: 325px;
+    max-width: 605px;
+  }
+
+  /* Instagram */
+  .embed-instagram {
+    max-width: 540px;
+  }
+
+  .embed-instagram blockquote.instagram-media {
+    background: #FFF !important;
+    border: 0 !important;
+    border-radius: 3px !important;
+    box-shadow: 0 0 1px 0 rgba(0,0,0,0.5), 0 1px 10px 0 rgba(0,0,0,0.15) !important;
+    margin: 1px auto !important;
+    max-width: 540px !important;
+    min-width: 326px !important;
+    padding: 0 !important;
+    width: calc(100% - 2px) !important;
+  }
+
+  /* Spotify */
+  .embed-spotify iframe {
+    border-radius: 12px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* SoundCloud */
+  .embed-soundcloud iframe {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Garantir responsividade de iframes */
+  .embed-container iframe {
+    max-width: 100%;
+    display: block;
+  }
+
+  /* Estilos para o editor TipTap */
+  .ProseMirror .embed-container {
+    cursor: default;
+    position: relative;
+  }
+
+  .ProseMirror .embed-container:hover {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+
+  .ProseMirror .embed-container[data-embed-type]::before {
+    content: attr(data-embed-type);
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .ProseMirror .embed-container:hover::before {
+    opacity: 0.9;
+  }
+
+  /* Preservar estilos nativos das plataformas */
+  .embed-container blockquote,
+  .embed-container iframe,
+  .embed-container script {
+    margin: 0;
+  }
+}
