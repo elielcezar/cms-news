@@ -1,0 +1,49 @@
+{
+  "nav": {
+    "home": "Inicio",
+    "categories": "Categorías",
+    "about": "Acerca de",
+    "contact": "Contacto"
+  },
+  "post": {
+    "readMore": "Leer más",
+    "shareOn": "Compartir en",
+    "relatedPosts": "Posts Relacionados",
+    "publishedAt": "Publicado en",
+    "by": "por",
+    "tags": "Tags",
+    "category": "Categoría"
+  },
+  "categories": {
+    "title": "Categorías",
+    "viewAll": "Ver todas",
+    "empty": "No se encontraron categorías",
+    "postsIn": "Posts en"
+  },
+  "footer": {
+    "rights": "Todos los derechos reservados",
+    "privacy": "Política de Privacidad",
+    "terms": "Términos de Uso",
+    "followUs": "Síguenos"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "notFound": "No encontrado",
+    "backToHome": "Volver al inicio",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "newest": "Más recientes",
+    "oldest": "Más antiguos",
+    "popular": "Populares"
+  },
+  "newsletter": {
+    "title": "Newsletter",
+    "description": "Recibe las últimas noticias directamente en tu email",
+    "placeholder": "Tu email",
+    "subscribe": "Suscribirse",
+    "thanks": "¡Gracias por suscribirte!"
+  }
+}
+

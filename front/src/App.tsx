@@ -4,6 +4,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { HelmetProvider } from "react-helmet-async";
+import { LanguageProvider } from "./contexts/LanguageContext";
+import { LanguageRedirect } from "./components/LanguageRedirect";
+import "./i18n/config";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/admin/Login";
@@ -27,38 +31,49 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="perfil" element={<Profile />} />
-                <Route path="posts" element={<Posts />} />
-                <Route path="posts/novo" element={<PostForm />} />
-                <Route path="posts/:id/editar" element={<PostForm />} />
-                <Route path="pautas" element={<Pautas />} />
-                <Route path="fontes" element={<Fontes />} />
-                <Route path="fontes/novo" element={<FonteForm />} />
-                <Route path="fontes/:id/editar" element={<FonteForm />} />
-                <Route path="categorias" element={<Categorias />} />
-                <Route path="categorias/novo" element={<CategoriaForm />} />
-                <Route path="categorias/:id/editar" element={<CategoriaForm />} />
-                <Route path="tags" element={<Tags />} />
-                <Route path="tags/novo" element={<TagForm />} />
-                <Route path="tags/:id/editar" element={<TagForm />} />
-            <Route path="usuarios" element={<Users />} />
-            <Route path="usuarios/novo" element={<UserForm />} />
-            <Route path="usuarios/:id/editar" element={<UserForm />} />
-          </Route>
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-      </TooltipProvider>
+      <HelmetProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <LanguageProvider>
+              <Routes>
+                {/* Rota raiz - detecta e redireciona para idioma */}
+                <Route path="/" element={<LanguageRedirect />} />
+                
+                {/* Rotas públicas com idioma */}
+                <Route path="/:lang" element={<Index />} />
+                
+                {/* Rotas de admin (sem idioma na URL) */}
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="perfil" element={<Profile />} />
+                  <Route path="posts" element={<Posts />} />
+                  <Route path="posts/novo" element={<PostForm />} />
+                  <Route path="posts/:id/editar" element={<PostForm />} />
+                  <Route path="pautas" element={<Pautas />} />
+                  <Route path="fontes" element={<Fontes />} />
+                  <Route path="fontes/novo" element={<FonteForm />} />
+                  <Route path="fontes/:id/editar" element={<FonteForm />} />
+                  <Route path="categorias" element={<Categorias />} />
+                  <Route path="categorias/novo" element={<CategoriaForm />} />
+                  <Route path="categorias/:id/editar" element={<CategoriaForm />} />
+                  <Route path="tags" element={<Tags />} />
+                  <Route path="tags/novo" element={<TagForm />} />
+                  <Route path="tags/:id/editar" element={<TagForm />} />
+                  <Route path="usuarios" element={<Users />} />
+                  <Route path="usuarios/novo" element={<UserForm />} />
+                  <Route path="usuarios/:id/editar" element={<UserForm />} />
+                </Route>
+                
+                {/* 404 */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </LanguageProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </HelmetProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

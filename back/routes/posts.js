@@ -282,7 +282,13 @@ router.get('/posts', async (req, res, next) => {
             include: {
                 categorias: {
                     include: {
-                        categoria: true
+                        categoria: {
+                            include: {
+                                translations: {
+                                    where: { idioma: lang }
+                                }
+                            }
+                        }
                     }
                 },
                 tags: {
@@ -323,7 +329,10 @@ router.get('/posts', async (req, res, next) => {
                 idiomaDefault: post.idiomaDefault,
                 createdAt: post.createdAt,
                 updatedAt: post.updatedAt,
-                categorias: post.categorias,
+                categorias: post.categorias.map(pc => ({
+                    id: pc.categoria.id,
+                    nome: pc.categoria.translations[0]?.nome || 'Sem tradução'
+                })),
                 tags: post.tags,
                 url: `${baseUrl}/posts/${translation.urlAmigavel}`,
                 // Manter referência às traduções disponíveis

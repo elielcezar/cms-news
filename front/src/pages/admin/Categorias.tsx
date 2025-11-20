@@ -50,7 +50,10 @@ export default function Categorias() {
 
   const filteredCategorias = (categorias || []).filter((categoria) => {
     const searchLower = searchTerm.toLowerCase();
-    return categoria.nome.toLowerCase().includes(searchLower);
+    // Buscar em todas as traduções
+    return categoria.translations?.some((t: any) => 
+      t.nome.toLowerCase().includes(searchLower)
+    ) || false;
   });
 
   const handleDelete = (id: number) => {
@@ -94,7 +97,9 @@ export default function Categorias() {
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
-                <TableHead>Nome</TableHead>
+                <TableHead>Nome (PT)</TableHead>
+                <TableHead>Nome (EN)</TableHead>
+                <TableHead>Nome (ES)</TableHead>
                 <TableHead>Data de Criação</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -102,21 +107,34 @@ export default function Categorias() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : filteredCategorias.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     {searchTerm ? 'Nenhuma categoria encontrada' : 'Nenhuma categoria cadastrada'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCategorias.map((categoria) => (
+                filteredCategorias.map((categoria) => {
+                  const ptTranslation = categoria.translations?.find((t: any) => t.idioma === 'pt');
+                  const enTranslation = categoria.translations?.find((t: any) => t.idioma === 'en');
+                  const esTranslation = categoria.translations?.find((t: any) => t.idioma === 'es');
+                  
+                  return (
                   <TableRow key={categoria.id}>
                     <TableCell className="font-medium">{categoria.id}</TableCell>
-                    <TableCell>{categoria.nome}</TableCell>
+                    <TableCell>
+                      {ptTranslation?.nome || <span className="text-muted-foreground italic">—</span>}
+                    </TableCell>
+                    <TableCell>
+                      {enTranslation?.nome || <span className="text-muted-foreground italic">—</span>}
+                    </TableCell>
+                    <TableCell>
+                      {esTranslation?.nome || <span className="text-muted-foreground italic">—</span>}
+                    </TableCell>
                     <TableCell>
                       {new Date(categoria.createdAt).toLocaleDateString('pt-BR')}
                     </TableCell>
@@ -140,7 +158,8 @@ export default function Categorias() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>

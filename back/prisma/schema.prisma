@@ -65,13 +65,28 @@ enum PostStatus {
 }
 
 model Categoria {
-  id        Int             @id @default(autoincrement())
-  nome      String          @unique
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  posts     PostCategoria[]
+  id           Int                      @id @default(autoincrement())
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  posts        PostCategoria[]
+  translations CategoriaTranslation[]
 
   @@map("categorias")
+}
+
+model CategoriaTranslation {
+  id          Int       @id @default(autoincrement())
+  categoriaId Int
+  idioma      String    // "pt", "en", "es"
+  nome        String
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([categoriaId, idioma])
+  @@map("categoria_translations")
+  @@index([categoriaId])
+  @@index([idioma])
 }
 
 model PostCategoria {

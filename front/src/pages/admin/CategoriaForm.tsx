@@ -16,7 +16,9 @@ export default function CategoriaForm() {
   const queryClient = useQueryClient();
   const isEdit = !!id;
 
-  const [nome, setNome] = useState('');
+  const [nomePt, setNomePt] = useState('');
+  const [nomeEn, setNomeEn] = useState('');
+  const [nomeEs, setNomeEs] = useState('');
 
   // Buscar categoria se for edição
   const { data: categoria } = useQuery({
@@ -29,14 +31,20 @@ export default function CategoriaForm() {
   });
 
   useEffect(() => {
-    if (categoria && isEdit) {
-      setNome(categoria.nome);
+    if (categoria && isEdit && categoria.translations) {
+      const ptTranslation = categoria.translations.find((t: any) => t.idioma === 'pt');
+      const enTranslation = categoria.translations.find((t: any) => t.idioma === 'en');
+      const esTranslation = categoria.translations.find((t: any) => t.idioma === 'es');
+      
+      setNomePt(ptTranslation?.nome || '');
+      setNomeEn(enTranslation?.nome || '');
+      setNomeEs(esTranslation?.nome || '');
     }
   }, [categoria, isEdit]);
 
   // Mutation para criar
   const createMutation = useMutation({
-    mutationFn: (data: { nome: string }) => categoriasService.create(data),
+    mutationFn: (data: any) => categoriasService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categorias'] });
       toast({
@@ -56,7 +64,7 @@ export default function CategoriaForm() {
 
   // Mutation para atualizar
   const updateMutation = useMutation({
-    mutationFn: (data: { nome: string }) => categoriasService.update(Number(id), data),
+    mutationFn: (data: any) => categoriasService.update(Number(id), data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categorias'] });
       queryClient.invalidateQueries({ queryKey: ['categoria', id] });
@@ -78,19 +86,27 @@ export default function CategoriaForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!nome.trim()) {
+    if (!nomePt.trim()) {
       toast({
         variant: 'destructive',
         title: 'Campo obrigatório',
-        description: 'O nome da categoria é obrigatório.',
+        description: 'O nome em Português é obrigatório.',
       });
       return;
     }
 
+    const data = {
+      translations: {
+        pt: nomePt,
+        ...(nomeEn && { en: nomeEn }),
+        ...(nomeEs && { es: nomeEs }),
+      }
+    };
+
     if (isEdit) {
-      updateMutation.mutate({ nome });
+      updateMutation.mutate(data);
     } else {
-      createMutation.mutate({ nome });
+      createMutation.mutate(data);
     }
   };
 
@@ -118,16 +134,54 @@ export default function CategoriaForm() {
             <CardTitle>Informações da Categoria</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="nome">Nome *</Label>
-              <Input
-                id="nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                required
-                disabled={isLoading}
-                placeholder="Ex: Tecnologia, Música, Eventos, Lifestyle..."
-              />
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-medium mb-4 text-muted-foreground">
+                  Traduções da Categoria
+                </h3>
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nome-pt" className="flex items-center gap-2">
+                      🇧🇷 Nome em Português *
+                    </Label>
+                    <Input
+                      id="nome-pt"
+                      value={nomePt}
+                      onChange={(e) => setNomePt(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      placeholder="Ex: Tecnologia, Música, Eventos..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="nome-en" className="flex items-center gap-2">
+                      🇺🇸 Nome em Inglês
+                    </Label>
+                    <Input
+                      id="nome-en"
+                      value={nomeEn}
+                      onChange={(e) => setNomeEn(e.target.value)}
+                      disabled={isLoading}
+                      placeholder="Ex: Technology, Music, Events..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="nome-es" className="flex items-center gap-2">
+                      🇪🇸 Nome em Espanhol
+                    </Label>
+                    <Input
+                      id="nome-es"
+                      value={nomeEs}
+                      onChange={(e) => setNomeEs(e.target.value)}
+                      disabled={isLoading}
+                      placeholder="Ex: Tecnología, Música, Eventos..."
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-4 pt-4">

@@ -10,19 +10,22 @@ const router = express.Router();
 router.post('/categorias', authenticateToken, validate(categoriaSchema), async (req, res, next) => {
     try {
         console.log('Recebendo requisição POST /categorias');
-        const { nome } = req.body;
+        const { translations } = req.body;
 
-        // Verificar se categoria já existe
-        const existingCategoria = await prisma.categoria.findUnique({
-            where: { nome }
-        });
-
-        if (existingCategoria) {
-            throw new ConflictError('Categoria já existe');
-        }
-
+        // Criar categoria com traduções
         const response = await prisma.categoria.create({
-            data: { nome }
+            data: {
+                translations: {
+                    create: [
+                        { idioma: 'pt', nome: translations.pt },
+                        ...(translations.en ? [{ idioma: 'en', nome: translations.en }] : []),
+                        ...(translations.es ? [{ idioma: 'es', nome: translations.es }] : []),
+                    ]
+                }
+            },
+            include: {
+                translations: true
+            }
         });
 
         console.log('Categoria criada:', response);
@@ -36,20 +39,32 @@ router.post('/categorias', authenticateToken, validate(categoriaSchema), async (
 router.get('/categorias', async (req, res, next) => {
     try {
         console.log('Recebendo requisição GET /categorias');
-
-        const filtro = {};
-        if (req.query.nome) {
-            filtro.nome = { contains: req.query.nome };
-        }
+        const { lang } = req.query; // pt, en, es
 
         const categorias = await prisma.categoria.findMany({
-            where: filtro,
+            include: {
+                translations: lang ? {
+                    where: { idioma: lang }
+                } : true
+            },
             orderBy: {
-                nome: 'asc'
+                createdAt: 'desc'
             }
         });
 
         console.log(`Categorias encontradas: ${categorias.length}`);
+        
+        // Se solicitou idioma específico, simplificar response
+        if (lang) {
+            const categoriasSimplificadas = categorias.map(cat => ({
+                id: cat.id,
+                nome: cat.translations[0]?.nome || 'Sem tradução',
+                createdAt: cat.createdAt,
+                updatedAt: cat.updatedAt
+            }));
+            return res.status(200).json(categoriasSimplificadas);
+        }
+        
         res.status(200).json(categorias);
     } catch (error) {
         next(error);
@@ -60,11 +75,27 @@ router.get('/categorias', async (req, res, next) => {
 router.put('/categorias/:id', authenticateToken, validate(categoriaSchema), async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { nome } = req.body;
+        const { translations } = req.body;
+
+        // Deletar traduções existentes e criar novas
+        await prisma.categoriaTranslation.deleteMany({
+            where: { categoriaId: parseInt(id) }
+        });
 
         const categoria = await prisma.categoria.update({
             where: { id: parseInt(id) },
-            data: { nome }
+            data: {
+                translations: {
+                    create: [
+                        { idioma: 'pt', nome: translations.pt },
+                        ...(translations.en ? [{ idioma: 'en', nome: translations.en }] : []),
+                        ...(translations.es ? [{ idioma: 'es', nome: translations.es }] : []),
+                    ]
+                }
+            },
+            include: {
+                translations: true
+            }
         });
 
         res.status(200).json(categoria);
