@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, X, Upload, Globe } from 'lucide-react';
+import { ArrowLeft, Loader2, X, Upload, Globe, Languages } from 'lucide-react';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TagInput } from '@/components/ui/tag-input';
@@ -53,6 +53,7 @@ export default function PostForm() {
   const [tagNames, setTagNames] = useState<string[]>([]); // Mudado para nomes de tags
   const [availableLanguages, setAvailableLanguages] = useState<string[]>(['pt']);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [isGeneratingTranslations, setIsGeneratingTranslations] = useState(false);
 
   // Buscar categorias (sempre em PT no admin)
   const { data: categorias } = useQuery({
@@ -101,18 +102,18 @@ export default function PostForm() {
         }
         return '';
       }).filter(Boolean) || [];
-      
+
       // Idiomas disponíveis (traduções existentes)
       const langs = post.translations?.map(t => t.idioma) || ['pt'];
       setAvailableLanguages(langs);
-      
+
       // Converter data para formato datetime-local (YYYY-MM-DDTHH:mm)
       let dataFormatada = '';
       if (post.dataPublicacao) {
         const date = new Date(post.dataPublicacao);
         dataFormatada = date.toISOString().slice(0, 16); // Remove segundos e timezone
       }
-      
+
       setFormData({
         titulo: post.titulo || '',
         chamada: post.chamada || '',
@@ -142,7 +143,7 @@ export default function PostForm() {
         chamada: pautaData.chamada || '',
         conteudo: pautaData.conteudo || '',
       }));
-      
+
       // Auto-gerar slug do título
       if (pautaData.titulo) {
         const slug = generateSlug(pautaData.titulo);
@@ -183,7 +184,7 @@ export default function PostForm() {
 
   // Mutation para atualizar
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<PostFormData>) => 
+    mutationFn: (data: Partial<PostFormData>) =>
       postsService.update(Number(id), data, currentLang),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
@@ -319,7 +320,7 @@ export default function PostForm() {
 
   // Toggle categoria
   const toggleCategoria = (categoriaId: number) => {
-    setSelectedCategorias(prev => 
+    setSelectedCategorias(prev =>
       prev.includes(categoriaId)
         ? prev.filter(id => id !== categoriaId)
         : [...prev, categoriaId]
@@ -329,6 +330,89 @@ export default function PostForm() {
   // Handler para busca de tags (autocomplete)
   const handleTagSearch = (query: string) => {
     setTagSearchQuery(query);
+  };
+
+  const handleGenerateTranslations = async () => {
+    if (!isEdit || !id) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'É necessário salvar o post antes de gerar traduções.',
+      });
+      return;
+    }
+
+    // Validar se há conteúdo suficiente
+    if (!formData.titulo || !formData.chamada || !formData.conteudo) {
+      toast({
+        variant: 'destructive',
+        title: 'Campos obrigatórios faltando',
+        description: 'Preencha título, chamada e conteúdo antes de gerar traduções.',
+      });
+      return;
+    }
+
+    try {
+      setIsGeneratingTranslations(true);
+
+      toast({
+        title: '🤖 Gerando traduções...',
+        description: 'A IA está gerando as traduções. Isso pode levar alguns segundos.',
+      });
+
+      // Chamar API para gerar traduções
+      const response = await postsService.generateTranslations(Number(id), {
+        idiomaOriginal: currentLang,
+        titulo: formData.titulo,
+        chamada: formData.chamada,
+        conteudo: formData.conteudo,
+      });
+
+      if (!response.success || !response.translations) {
+        throw new Error('Falha ao gerar traduções');
+      }
+
+      // Salvar cada tradução gerada
+      const idiomasGerados = Object.keys(response.translations);
+
+      for (const lang of idiomasGerados) {
+        const translation = response.translations[lang];
+
+        await postsService.update(
+          Number(id),
+          {
+            titulo: translation.titulo,
+            chamada: translation.chamada,
+            conteudo: translation.conteudo,
+            urlAmigavel: translation.urlAmigavel,
+            categorias: selectedCategorias,
+            tags: await tagsService.resolveTagIds(tagNames),
+          },
+          lang as 'pt' | 'en' | 'es'
+        );
+      }
+
+      // Atualizar lista de idiomas disponíveis
+      const novosIdiomas = [...new Set([...availableLanguages, ...idiomasGerados])];
+      setAvailableLanguages(novosIdiomas);
+
+      // Recarregar post
+      await refetchPost();
+
+      toast({
+        title: '✅ Traduções geradas com sucesso!',
+        description: `As traduções em ${idiomasGerados.map(l => l.toUpperCase()).join(' e ')} foram criadas e salvas.`,
+      });
+    } catch (error) {
+      console.error('Erro ao gerar traduções:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao gerar traduções',
+        description: error instanceof Error ? error.message : 'Erro desconhecido ao gerar traduções.',
+      });
+    } finally {
+      setIsGeneratingTranslations(false);
+    }
   };
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
@@ -411,7 +495,7 @@ export default function PostForm() {
                 title="Use formato: pt/titulo-do-post ou apenas titulo-do-post"
               />
               <p className="text-sm text-muted-foreground">
-                {isEdit 
+                {isEdit
                   ? `Slug com idioma (ex: ${currentLang}/meu-post). O prefixo ${currentLang}/ é adicionado automaticamente.`
                   : 'Slug para URL (ex: meu-primeiro-post). Gerado automaticamente do título.'
                 }
@@ -585,9 +669,31 @@ export default function PostForm() {
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isEdit ? 'Salvar Alterações' : 'Criar Post'}
               </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
+
+              {isEdit && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleGenerateTranslations}
+                  disabled={isLoading || isGeneratingTranslations}
+                >
+                  {isGeneratingTranslations ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <Languages className="mr-2 h-4 w-4" />
+                      Gerar Traduções
+                    </>
+                  )}
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => navigate('/admin/posts')}
                 disabled={isLoading}
               >

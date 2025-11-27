@@ -651,3 +651,150 @@ Retorne APENAS o JSON, sem texto adicional.`;
   });
 }
 
+/**
+ * Gera traduções de um post existente para os idiomas faltantes
+ * @param {Object} params - Parâmetros
+ * @param {string} params.titulo - Título do post original
+ * @param {string} params.chamada - Chamada do post original
+ * @param {string} params.conteudo - Conteúdo HTML do post original
+ * @param {string} params.idiomaOriginal - Idioma do post ('pt', 'en' ou 'es')
+ * @returns {Promise<Object>} - JSON com traduções geradas {idioma: {titulo, chamada, conteudo}}
+ */
+export async function generateTranslationsFromPost({ titulo, chamada, conteudo, idiomaOriginal }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY não configurada no .env');
+  }
+
+  // Validar idioma original
+  const idiomasValidos = ['pt', 'en', 'es'];
+  if (!idiomasValidos.includes(idiomaOriginal)) {
+    throw new Error(`Idioma original inválido: ${idiomaOriginal}. Use: pt, en ou es`);
+  }
+
+  // Determinar idiomas alvo (os 2 que faltam)
+  const idiomasAlvo = idiomasValidos.filter(lang => lang !== idiomaOriginal);
+
+  // Mapear nomes completos dos idiomas
+  const nomeIdiomas = {
+    pt: 'Português',
+    en: 'Inglês',
+    es: 'Espanhol'
+  };
+
+  const prompt = `Você é um tradutor profissional especializado em conteúdo sobre música eletrônica, fluente em Português, Inglês e Espanhol.
+
+POST ORIGINAL (em ${nomeIdiomas[idiomaOriginal]}):
+Título: ${titulo}
+Chamada: ${chamada}
+Conteúdo: ${conteudo.substring(0, 3000)}
+
+TAREFA:
+Traduza/adapte este post para ${idiomasAlvo.map(lang => nomeIdiomas[lang]).join(' e ')}.
+
+IMPORTANTE:
+- NÃO faça apenas tradução literal - adapte culturalmente cada versão
+- Mantenha o tom profissional e informativo do original
+- Preserve a estrutura HTML do conteúdo (tags <p>, <h2>, <strong>, etc.)
+- Use nomes e expressões naturais em cada idioma
+- Cada versão deve ter comprimento similar ao original
+
+FORMATO DE RESPOSTA (JSON):
+{
+  "${idiomasAlvo[0]}": {
+    "titulo": "Título traduzido/adaptado",
+    "chamada": "Chamada traduzida/adaptada",
+    "conteudo": "<p>Conteúdo completo em HTML traduzido/adaptado...</p>"
+  },
+  "${idiomasAlvo[1]}": {
+    "titulo": "Título traduzido/adaptado",
+    "chamada": "Chamada traduzida/adaptada",
+    "conteudo": "<p>Conteúdo completo em HTML traduzido/adaptado...</p>"
+  }
+}
+
+Retorne APENAS o JSON, sem texto adicional.`;
+
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é um tradutor profissional multilíngue. Sempre responda em JSON válido com as traduções solicitadas.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000
+    });
+
+    const options = {
+      hostname: 'api.openai.com',
+      port: 443,
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    console.log(`🤖 Gerando traduções de ${idiomaOriginal.toUpperCase()} para ${idiomasAlvo.map(l => l.toUpperCase()).join(' e ')}...`);
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          if (res.statusCode !== 200) {
+            console.error('❌ OpenAI error:', data);
+            reject(new Error(`OpenAI retornou status ${res.statusCode}`));
+            return;
+          }
+
+          const response = JSON.parse(data);
+          const content = response.choices[0].message.content;
+
+          // Remove marcadores de código markdown se houver
+          let jsonString = content
+            .replace(/```json\n?/g, '')
+            .replace(/```\n?/g, '')
+            .trim();
+
+          const translations = JSON.parse(jsonString);
+
+          // Validar que as traduções foram geradas
+          for (const lang of idiomasAlvo) {
+            if (!translations[lang] || !translations[lang].titulo || !translations[lang].conteudo) {
+              throw new Error(`Tradução para ${lang} incompleta ou inválida`);
+            }
+          }
+
+          console.log(`✅ Traduções geradas com sucesso para ${idiomasAlvo.map(l => l.toUpperCase()).join(' e ')}`);
+          resolve(translations);
+        } catch (error) {
+          console.error('❌ Erro ao parsear resposta da IA:', error);
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('❌ Erro na requisição OpenAI:', error);
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}

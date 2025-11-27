@@ -21,7 +21,7 @@ const handleMulterError = (upload) => {
                     field: err.field,
                     name: err.name
                 });
-                
+
                 if (err.code === 'LIMIT_FILE_SIZE') {
                     const maxSizeMB = 10;
                     const fileName = err.field ? `O arquivo "${err.field}"` : 'Um arquivo';
@@ -30,35 +30,35 @@ const handleMulterError = (upload) => {
                         message: `${fileName} excede o limite de ${maxSizeMB}MB. Por favor, comprima a imagem antes de enviar.`
                     });
                 }
-                
+
                 if (err.code === 'LIMIT_FILE_COUNT') {
                     return res.status(400).json({
                         error: 'Muitos arquivos',
                         message: 'O número máximo de arquivos é 18'
                     });
                 }
-                
+
                 if (err.message && err.message.includes('Tipo de arquivo inválido')) {
                     return res.status(400).json({
                         error: 'Tipo de arquivo inválido',
                         message: err.message
                     });
                 }
-                
+
                 // Erros do S3/AWS - capturar qualquer erro relacionado ao S3
-                const isS3Error = err.name === 'S3Client' || 
-                                 err.$metadata || 
-                                 err.Code || 
-                                 err.code === 'CredentialsError' || 
-                                 err.name === 'NoCredentialsError' ||
-                                 err.name === 'AccessDenied' ||
-                                 err.code === 'AccessDenied' ||
-                                 err.message?.includes('S3') ||
-                                 err.message?.includes('AWS') ||
-                                 err.message?.includes('bucket') ||
-                                 err.stack?.includes('s3') ||
-                                 err.stack?.includes('S3');
-                
+                const isS3Error = err.name === 'S3Client' ||
+                    err.$metadata ||
+                    err.Code ||
+                    err.code === 'CredentialsError' ||
+                    err.name === 'NoCredentialsError' ||
+                    err.name === 'AccessDenied' ||
+                    err.code === 'AccessDenied' ||
+                    err.message?.includes('S3') ||
+                    err.message?.includes('AWS') ||
+                    err.message?.includes('bucket') ||
+                    err.stack?.includes('s3') ||
+                    err.stack?.includes('S3');
+
                 if (isS3Error) {
                     console.error('❌ Erro no S3/AWS:', err);
                     console.error('   Tipo:', err.name || err.constructor?.name);
@@ -68,10 +68,10 @@ const handleMulterError = (upload) => {
                     if (err.$metadata) {
                         console.error('   Metadata:', JSON.stringify(err.$metadata, null, 2));
                     }
-                    
+
                     let errorMessage = 'Erro ao fazer upload para S3';
                     let statusCode = 500;
-                    
+
                     if (err.name === 'NoCredentialsError' || err.code === 'CredentialsError' || err.message?.includes('credentials')) {
                         errorMessage = 'Credenciais AWS não configuradas ou inválidas. Verifique as variáveis AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY no servidor.';
                         statusCode = 500;
@@ -90,7 +90,7 @@ const handleMulterError = (upload) => {
                     } else {
                         errorMessage = `Erro S3: ${err.message || 'Erro desconhecido'}`;
                     }
-                    
+
                     return res.status(statusCode).json({
                         error: 'Erro ao fazer upload para S3',
                         message: errorMessage,
@@ -100,7 +100,7 @@ const handleMulterError = (upload) => {
                         }
                     });
                 }
-                
+
                 return res.status(500).json({
                     error: 'Erro ao processar upload',
                     message: process.env.NODE_ENV === 'development' ? err.message : 'Erro ao fazer upload de imagens'
@@ -120,22 +120,22 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
             'content-type': req.headers['content-type'],
             'content-length': req.headers['content-length']
         });
-        
-      const { 
-        titulo, 
-        chamada, 
-        conteudo,
-        urlAmigavel,
-        status,
-        destaque,
-        dataPublicacao,
-        categorias,
-        tags
-      } = req.body;
+
+        const {
+            titulo,
+            chamada,
+            conteudo,
+            urlAmigavel,
+            status,
+            destaque,
+            dataPublicacao,
+            categorias,
+            tags
+        } = req.body;
 
         console.log('📝 Dados body recebidos:', {
-            titulo, 
-            chamada, 
+            titulo,
+            chamada,
             conteudo,
             urlAmigavel,
             status,
@@ -157,7 +157,7 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
         }) : [];
 
         console.log('🔗 URLs das imagens:', imagens);
-        
+
         // Validações básicas
         if (!titulo || !chamada || !conteudo || !urlAmigavel) {
             return res.status(400).json({
@@ -165,69 +165,69 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
                 message: 'Título, chamada, conteúdo e URL amigável são obrigatórios'
             });
         }
-        
+
         console.log('💾 Criando post no banco de dados...');
-        
-      // Criar relacionamentos de categorias e tags
-      const categoriasData = categorias ? JSON.parse(categorias).map(categoriaId => ({
-        categoriaId: parseInt(categoriaId)
-      })) : [];
-      
-      const tagsData = tags ? JSON.parse(tags).map(tagId => ({
-        tagId: parseInt(tagId)
-      })) : [];
 
-      // Gerar URL amigável com prefixo pt/
-      let urlFinal = urlAmigavel.startsWith('pt/') ? urlAmigavel : `pt/${urlAmigavel}`;
-      
-      // Verificar se já existe
-      let contador = 1;
-      let urlTemp = urlFinal;
-      while (await prisma.postTranslation.findUnique({ where: { urlAmigavel: urlTemp } })) {
-        const baseSlug = urlAmigavel.replace('pt/', '');
-        urlTemp = `pt/${baseSlug}-${contador}`;
-        contador++;
-      }
-      urlFinal = urlTemp;
+        // Criar relacionamentos de categorias e tags
+        const categoriasData = categorias ? JSON.parse(categorias).map(categoriaId => ({
+            categoriaId: parseInt(categoriaId)
+        })) : [];
 
-      const response = await prisma.post.create({
-        data: {
-          status: status || 'RASCUNHO',
-          destaque: destaque === 'true' || destaque === true,
-          dataPublicacao: dataPublicacao ? new Date(dataPublicacao) : null,
-          imagens: imagens,
-          idiomaDefault: 'pt',
-          categorias: {
-            create: categoriasData
-          },
-          tags: {
-            create: tagsData
-          },
-          translations: {
-            create: {
-              idioma: 'pt',
-              titulo,
-              chamada,
-              conteudo,
-              urlAmigavel: urlFinal
-            }
-          }
-        },
-        include: {
-          categorias: {
-            include: {
-              categoria: true
-            }
-          },
-          tags: {
-            include: {
-              tag: true
-            }
-          },
-          translations: true
+        const tagsData = tags ? JSON.parse(tags).map(tagId => ({
+            tagId: parseInt(tagId)
+        })) : [];
+
+        // Gerar URL amigável com prefixo pt/
+        let urlFinal = urlAmigavel.startsWith('pt/') ? urlAmigavel : `pt/${urlAmigavel}`;
+
+        // Verificar se já existe
+        let contador = 1;
+        let urlTemp = urlFinal;
+        while (await prisma.postTranslation.findUnique({ where: { urlAmigavel: urlTemp } })) {
+            const baseSlug = urlAmigavel.replace('pt/', '');
+            urlTemp = `pt/${baseSlug}-${contador}`;
+            contador++;
         }
-      });
-        
+        urlFinal = urlTemp;
+
+        const response = await prisma.post.create({
+            data: {
+                status: status || 'RASCUNHO',
+                destaque: destaque === 'true' || destaque === true,
+                dataPublicacao: dataPublicacao ? new Date(dataPublicacao) : null,
+                imagens: imagens,
+                idiomaDefault: 'pt',
+                categorias: {
+                    create: categoriasData
+                },
+                tags: {
+                    create: tagsData
+                },
+                translations: {
+                    create: {
+                        idioma: 'pt',
+                        titulo,
+                        chamada,
+                        conteudo,
+                        urlAmigavel: urlFinal
+                    }
+                }
+            },
+            include: {
+                categorias: {
+                    include: {
+                        categoria: true
+                    }
+                },
+                tags: {
+                    include: {
+                        tag: true
+                    }
+                },
+                translations: true
+            }
+        });
+
         console.log('✅ Post criado com sucesso:', response.id);
         res.status(201).json(response);
     } catch (error) {
@@ -253,16 +253,16 @@ router.get('/admin/posts', authenticateToken, async (req, res, next) => {
 
         // Criar objeto de filtro (SEM filtro de status - retorna todos)
         const filtro = {};
-        
+
         // Filtro por status (opcional para admin)
         if (req.query.status) {
             filtro.status = req.query.status;
         }
-        
+
         // Filtro por destaque/featured
         const destaqueValue = req.query.featured || req.query.destaque;
         if (destaqueValue) filtro.destaque = destaqueValue === 'true';
-        
+
         // Filtro por categoria
         const categoriaValue = req.query.category || req.query.categoria;
         if (categoriaValue) {
@@ -288,7 +288,7 @@ router.get('/admin/posts', authenticateToken, async (req, res, next) => {
                 };
             }
         }
-        
+
         // Filtro por tag
         if (req.query.tag) {
             const tagId = parseInt(req.query.tag);
@@ -342,7 +342,7 @@ router.get('/admin/posts', authenticateToken, async (req, res, next) => {
         // Transformar posts para incluir dados da tradução no nível raiz
         const postsCompleto = posts.map(post => {
             const translation = post.translations[0]; // Pega a tradução do idioma solicitado
-            
+
             // Para admin, retornar mesmo sem tradução (mas marcar)
             if (!translation) {
                 console.warn(`⚠️  Post #${post.id} não tem tradução em ${lang}`);
@@ -398,7 +398,7 @@ router.get('/admin/posts', authenticateToken, async (req, res, next) => {
 
         console.log(`✅ Posts encontrados (ADMIN): ${postsCompleto.length} (idioma: ${lang})`);
         res.status(200).json(postsCompleto);
-        
+
     } catch (error) {
         next(error);
     }
@@ -418,11 +418,11 @@ router.get('/posts', async (req, res, next) => {
         const filtro = {
             status: 'PUBLICADO' // Sempre filtrar por status PUBLICADO
         };
-        
+
         // Filtro por destaque/featured (aceita 'destaque' ou 'featured' para compatibilidade)
         const destaqueValue = req.query.featured || req.query.destaque;
         if (destaqueValue) filtro.destaque = destaqueValue === 'true';
-        
+
         // Filtro por categoria (aceita 'category' ou 'categoria' para compatibilidade)
         const categoriaValue = req.query.category || req.query.categoria;
         if (categoriaValue) {
@@ -450,7 +450,7 @@ router.get('/posts', async (req, res, next) => {
                 };
             }
         }
-        
+
         // Compatibilidade: aceitar 'site' também (legado)
         if (req.query.site && !categoriaValue) {
             filtro.categorias = {
@@ -466,7 +466,7 @@ router.get('/posts', async (req, res, next) => {
                 }
             };
         }
-        
+
         // Filtro por tag (nome ou ID)
         if (req.query.tag) {
             const tagId = parseInt(req.query.tag);
@@ -522,7 +522,7 @@ router.get('/posts', async (req, res, next) => {
         // Transformar posts para incluir dados da tradução no nível raiz
         const postsCompleto = posts.map(post => {
             const translation = post.translations[0]; // Pega a tradução do idioma solicitado
-            
+
             if (!translation) {
                 console.warn(`⚠️  Post #${post.id} não tem tradução em ${lang}`);
                 return null; // Ignora posts sem tradução no idioma solicitado
@@ -557,7 +557,7 @@ router.get('/posts', async (req, res, next) => {
 
         console.log(`Posts encontrados: ${postsCompleto.length} (idioma: ${lang})`);
         res.status(200).json(postsCompleto);
-        
+
     } catch (error) {
         next(error);
     }
@@ -591,14 +591,14 @@ router.get('/admin/posts/:id', authenticateToken, async (req, res, next) => {
                 translations: true // Incluir todas as traduções
             }
         });
-        
+
         if (!post) {
             throw new NotFoundError('Post não encontrado');
         }
 
         // Encontrar tradução no idioma solicitado
         const translation = post.translations.find(t => t.idioma === lang);
-        
+
         // Para admin, retornar mesmo sem tradução (mas com campos vazios)
         if (!translation) {
             console.warn(`⚠️ Post #${post.id} não tem tradução em ${lang}`);
@@ -647,7 +647,7 @@ router.get('/admin/posts/:id', authenticateToken, async (req, res, next) => {
                 urlAmigavel: t.urlAmigavel
             }))
         };
-        
+
         console.log(`✅ Post encontrado (ADMIN): ${postCompleto.titulo}`);
         res.json(postCompleto);
     } catch (error) {
@@ -680,14 +680,14 @@ router.get('/posts/id/:id', async (req, res, next) => {
                 translations: true // Incluir todas as traduções
             }
         });
-        
+
         if (!post) {
             throw new NotFoundError('Post não encontrado');
         }
 
         // Encontrar tradução no idioma solicitado
         const translation = post.translations.find(t => t.idioma === lang);
-        
+
         if (!translation) {
             return res.status(404).json({
                 error: `Tradução não disponível em ${lang}`,
@@ -717,7 +717,7 @@ router.get('/posts/id/:id', async (req, res, next) => {
                 urlAmigavel: t.urlAmigavel
             }))
         };
-        
+
         res.json(postCompleto);
     } catch (error) {
         next(error);
@@ -756,18 +756,18 @@ router.get('/posts/:lang/:slug', async (req, res, next) => {
                 }
             }
         });
-        
+
         if (!translation) {
             throw new NotFoundError('Post não encontrado');
         }
 
         const post = translation.post;
-        
+
         // Verificar se o post está publicado (endpoint público - apenas posts PUBLICADOS)
         if (post.status !== 'PUBLICADO') {
             throw new NotFoundError('Post não encontrado');
         }
-        
+
         // Montar resposta
         const postCompleto = {
             id: post.id,
@@ -790,7 +790,7 @@ router.get('/posts/:lang/:slug', async (req, res, next) => {
                 urlAmigavel: t.urlAmigavel
             }))
         };
-        
+
         res.json(postCompleto);
         console.log('Post encontrado:', translation.titulo);
     } catch (error) {
@@ -832,7 +832,7 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
 
         // Processar imagens (armazenadas no post base)
         let imagens = [];
-        
+
         // Se oldImages foi enviado (mesmo que vazio), usar esse valor
         // Isso permite remover todas as imagens ao enviar array vazio
         if (oldImages !== undefined) {
@@ -846,13 +846,13 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
             // Se oldImages não foi enviado, manter imagens existentes
             imagens = postExistente.imagens || [];
         }
-        
+
         // Adicionar novas imagens enviadas
         if (req.files && req.files.length > 0) {
             const novasImagens = req.files.map(file => file.location);
             imagens = [...imagens, ...novasImagens];
         }
-        
+
         console.log(`📸 Imagens processadas: ${imagens.length} total (${req.files?.length || 0} novas)`);
 
         // Atualizar dados do post base
@@ -920,7 +920,7 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
             await prisma.postCategoria.deleteMany({
                 where: { postId: parseInt(id) }
             });
-            
+
             // Adicionar novas categorias se houver
             let categoriasArray = [];
             if (typeof categorias === 'string') {
@@ -933,7 +933,7 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
             } else if (Array.isArray(categorias)) {
                 categoriasArray = categorias;
             }
-            
+
             if (categoriasArray.length > 0) {
                 for (const categoriaId of categoriasArray) {
                     try {
@@ -956,7 +956,7 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
             await prisma.postTag.deleteMany({
                 where: { postId: parseInt(id) }
             });
-            
+
             const tagsArray = JSON.parse(tags);
             for (const tagId of tagsArray) {
                 await prisma.postTag.create({
@@ -1026,8 +1026,8 @@ router.post('/posts/:id/translations', authenticateToken, async (req, res, next)
         }
 
         // Garantir prefixo de idioma na URL
-        const urlFinal = urlAmigavel.startsWith(`${idioma}/`) 
-            ? urlAmigavel 
+        const urlFinal = urlAmigavel.startsWith(`${idioma}/`)
+            ? urlAmigavel
             : `${idioma}/${urlAmigavel}`;
 
         // Verificar se tradução já existe
@@ -1089,6 +1089,82 @@ router.delete('/posts/:id', authenticateToken, async (req, res, next) => {
 
         res.status(200).json({ message: 'Post deletado com sucesso' });
     } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * POST /api/posts/:id/generate-translations
+ * Gera traduções automáticas de um post para os idiomas faltantes
+ * Protegido - requer autenticação
+ */
+router.post('/posts/:id/generate-translations', authenticateToken, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { idiomaOriginal, titulo, chamada, conteudo } = req.body;
+
+        console.log(`📥 POST /posts/${id}/generate-translations - Idioma: ${idiomaOriginal}`);
+
+        // Validações
+        if (!idiomaOriginal || !titulo || !chamada || !conteudo) {
+            return res.status(400).json({
+                error: 'Campos obrigatórios faltando',
+                message: 'idiomaOriginal, titulo, chamada e conteudo são obrigatórios'
+            });
+        }
+
+        if (!['pt', 'en', 'es'].includes(idiomaOriginal)) {
+            return res.status(400).json({
+                error: 'Idioma inválido',
+                message: 'idiomaOriginal deve ser: pt, en ou es'
+            });
+        }
+
+        // Verificar se o post existe
+        const post = await prisma.post.findUnique({
+            where: { id: parseInt(id) },
+            include: { translations: true }
+        });
+
+        if (!post) {
+            return res.status(404).json({
+                error: 'Post não encontrado',
+                message: `Post com ID ${id} não existe`
+            });
+        }
+
+        // Importar função de IA
+        const { generateTranslationsFromPost, generateSlug } = await import('../services/aiService.js');
+
+        console.log('🤖 Chamando IA para gerar traduções...');
+
+        // Gerar traduções com a IA
+        const translations = await generateTranslationsFromPost({
+            titulo,
+            chamada,
+            conteudo,
+            idiomaOriginal
+        });
+
+        // Gerar URLs amigáveis para cada tradução
+        const translationsWithUrls = {};
+        for (const [lang, translation] of Object.entries(translations)) {
+            const slug = generateSlug(translation.titulo);
+            translationsWithUrls[lang] = {
+                ...translation,
+                urlAmigavel: `${lang}/${slug}`
+            };
+        }
+
+        console.log(`✅ Traduções geradas: ${Object.keys(translationsWithUrls).join(', ').toUpperCase()}`);
+
+        res.status(200).json({
+            success: true,
+            translations: translationsWithUrls
+        });
+    } catch (error) {
+        console.error('❌ Erro ao gerar traduções:', error);
+        console.error('Stack:', error.stack);
         next(error);
     }
 });

@@ -47,18 +47,18 @@ export const postsService = {
   async create(data: PostFormData): Promise<Post> {
     try {
       const formData = new FormData();
-      
+
       // Adicionar campos de texto obrigatórios
       formData.append('titulo', data.titulo);
       formData.append('chamada', data.chamada);
       formData.append('conteudo', data.conteudo);
       formData.append('urlAmigavel', data.urlAmigavel);
-      
+
       // Adicionar campos opcionais
       if (data.status) formData.append('status', data.status);
       if (data.destaque !== undefined) formData.append('destaque', data.destaque.toString());
       if (data.dataPublicacao) formData.append('dataPublicacao', data.dataPublicacao);
-      
+
       // Adicionar categorias e tags como JSON
       if (data.categorias && data.categorias.length > 0) {
         formData.append('categorias', JSON.stringify(data.categorias));
@@ -103,7 +103,7 @@ export const postsService = {
       if (data.status) formData.append('status', data.status);
       if (data.destaque !== undefined) formData.append('destaque', data.destaque.toString());
       if (data.dataPublicacao) formData.append('dataPublicacao', data.dataPublicacao);
-      
+
       // Adicionar categorias e tags (sempre enviar, mesmo se vazio)
       if (data.categorias !== undefined) {
         formData.append('categorias', JSON.stringify(data.categorias || []));
@@ -160,6 +160,40 @@ export const postsService = {
   async delete(id: number): Promise<void> {
     try {
       await apiClient.delete(`/posts/${id}`);
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
+   * Gerar traduções automáticas de um post usando IA
+   */
+  async generateTranslations(
+    postId: number,
+    data: {
+      idiomaOriginal: 'pt' | 'en' | 'es';
+      titulo: string;
+      chamada: string;
+      conteudo: string;
+    }
+  ): Promise<{
+    success: boolean;
+    translations: {
+      [key: string]: {
+        titulo: string;
+        chamada: string;
+        conteudo: string;
+        urlAmigavel: string;
+      };
+    };
+  }> {
+    try {
+      console.log(`🤖 Gerando traduções para post #${postId} (idioma original: ${data.idiomaOriginal})`);
+
+      const response = await apiClient.post(`/posts/${postId}/generate-translations`, data);
+
+      console.log('✅ Traduções geradas pela IA:', Object.keys(response.data.translations));
+      return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));
     }
