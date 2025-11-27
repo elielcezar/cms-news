@@ -6,14 +6,6 @@ import { Pauta } from '@/types/admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -32,7 +24,7 @@ export default function Pautas() {
   const [convertingPautaId, setConvertingPautaId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const selectAllCheckboxRef = useRef<HTMLButtonElement>(null);
+  const selectAllCheckboxRef = useRef<HTMLButtonElement & { indeterminate?: boolean }>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -314,113 +306,183 @@ export default function Pautas() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de Sugestões ({filteredPautas.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox
-                    ref={selectAllCheckboxRef}
-                    checked={isAllSelected}
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
-                <TableHead className="w-[60px]">ID</TableHead>
-                <TableHead>Assunto</TableHead>
-                <TableHead>Resumo</TableHead>
-                <TableHead className="w-[120px]">Data</TableHead>
-                <TableHead className="w-[200px] text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                  </TableCell>
-                </TableRow>
-              ) : filteredPautas.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    {searchTerm ? 'Nenhuma pauta encontrada' : 'Nenhuma sugestão de pauta ainda'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredPautas.map((pauta) => (
-                  <TableRow 
-                    key={pauta.id} 
-                    className={!pauta.lida ? 'font-semibold' : ''}
-                  >
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(pauta.id)}
-                        onCheckedChange={(checked) => handleSelectPauta(pauta.id, checked as boolean)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{pauta.id}</TableCell>
-                    <TableCell className={!pauta.lida ? 'font-bold' : ''}>
-                      <div className="flex items-center gap-2">
-                        {!pauta.lida && (
-                          <Badge variant="default" className="text-xs">Nova</Badge>
-                        )}
-                        {truncate(pauta.assunto, 50)}
+      <div className="space-y-4">
+        {/* Header com checkbox de selecionar todas */}
+        {filteredPautas.length > 0 && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                ref={selectAllCheckboxRef}
+                checked={isAllSelected}
+                onCheckedChange={handleSelectAll}
+              />
+              <span className="text-sm text-muted-foreground">
+                Selecionar todas ({filteredPautas.length})
+              </span>
+            </div>
+            <CardTitle className="text-lg">
+              Sugestões de Pauta ({filteredPautas.length})
+            </CardTitle>
+          </div>
+        )}
+
+        {/* Grid de Cards */}
+        {isLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredPautas.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              {searchTerm ? 'Nenhuma pauta encontrada' : 'Nenhuma sugestão de pauta ainda'}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-4 xlg:grid-cols-5 gap-4">
+            {filteredPautas.map((pauta) => {
+              const isConverting = convertingPautaId === pauta.id;
+              const isDisabled = convertingPautaId !== null && !isConverting;
+
+              return (
+                <Card
+                  key={pauta.id}
+                  className={`relative transition-all duration-300 ${
+                    isConverting
+                      ? 'ring-2 ring-primary shadow-lg scale-[1.02] z-10'
+                      : isDisabled
+                      ? 'opacity-40 pointer-events-none'
+                      : !pauta.lida
+                      ? 'border-primary/50 bg-primary/5'
+                      : ''
+                  }`}
+                >
+                  {isConverting && (
+                    <div className="absolute inset-0 bg-primary/5 rounded-lg flex items-center justify-center z-20">
+                      <div className="flex flex-col items-center gap-2 bg-background/95 p-4 rounded-lg shadow-lg border">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-sm font-medium">Gerando notícia com IA...</p>
+                        <p className="text-xs text-muted-foreground">Aguarde alguns segundos</p>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {truncate(pauta.resumo, 80)}
-                    </TableCell>
-                    <TableCell className="text-sm">
+                    </div>
+                  )}
+
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Checkbox
+                            checked={selectedIds.has(pauta.id)}
+                            onCheckedChange={(checked) => handleSelectPauta(pauta.id, checked as boolean)}
+                            disabled={isDisabled}
+                          />
+                          {!pauta.lida && (
+                            <Badge variant="default" className="text-xs">Nova</Badge>
+                          )}
+                          <Badge variant="outline" className="text-xs">
+                            #{pauta.id}
+                          </Badge>
+                        </div>
+                        <CardTitle className="text-lg leading-tight">
+                          {pauta.assunto}
+                        </CardTitle>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4">
+                    {/* Resumo */}
+                    <div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {pauta.resumo}
+                      </p>
+                    </div>
+
+                    {/* Fontes */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                        Fontes ({pauta.fontes.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {pauta.fontes.slice(0, 3).map((fonte, index) => (
+                          <div key={index} className="flex items-center gap-2 text-xs">
+                            <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <a
+                              href={fonte.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline truncate"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {fonte.nome}
+                            </a>
+                          </div>
+                        ))}
+                        {pauta.fontes.length > 3 && (
+                          <p className="text-xs text-muted-foreground">
+                            +{pauta.fontes.length - 3} fonte(s) adicional(is)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Data */}
+                    <div className="text-xs text-muted-foreground">
                       {new Date(pauta.createdAt).toLocaleDateString('pt-BR', {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
                       })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleViewDetails(pauta)}
-                          title="Ver detalhes"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleConvertToPost(pauta.id)}
-                          disabled={convertingPautaId !== null}
-                          title="Converter em post com IA"
-                        >
-                          {convertingPautaId === pauta.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <FileEdit className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(pauta.id)}
-                          disabled={deletePauta.isPending || deleteMultiplePautas.isPending}
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex gap-2 pt-2 border-t">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleConvertToPost(pauta.id)}
+                        disabled={isDisabled || convertToPost.isPending}
+                        className="flex-1"
+                      >
+                        {isConverting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Gerando...
+                          </>
+                        ) : (
+                          <>
+                            <FileEdit className="h-4 w-4 mr-2" />
+                            Converter
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDetails(pauta)}
+                        disabled={isDisabled}
+                        title="Ver detalhes"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(pauta.id)}
+                        disabled={isDisabled || deletePauta.isPending || deleteMultiplePautas.isPending}
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Dialog de Detalhes */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
