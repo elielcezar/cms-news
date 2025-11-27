@@ -35,6 +35,19 @@ export async function fetchContentWithJina(url) {
 }
 
 /**
+ * Busca conteúdo de uma URL usando Jina AI Reader e retorna conteúdo + markdown
+ * @param {string} url - URL para buscar
+ * @returns {Promise<{content: string, markdown: string}>} - Conteúdo e markdown (mesmo valor do Jina)
+ */
+export async function fetchContentWithJinaAndMarkdown(url) {
+  const markdown = await fetchContentWithJina(url);
+  return {
+    content: markdown,
+    markdown: markdown
+  };
+}
+
+/**
  * Gera uma notícia usando IA (OpenAI ou similar)
  * @param {Object} params - Parâmetros
  * @param {string} params.assunto - Assunto da pauta
@@ -157,7 +170,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
         'Content-Length': Buffer.byteLength(postData)
       }
     };
-1. 
+
     console.log('🤖 Chamando OpenAI para gerar notícia...');
 
     const req = https.request(options, (res) => {
@@ -279,6 +292,7 @@ ${conteudosTexto}
 
 INSTRUÇÕES:
 - Identifique notícias interessantes dos últimos 7 dias
+- Se o mesmo assunto aparecer em mais de uma fonte, marque-o adicioando a tag [IMPORTANTE] no começo do assunto.
 - Para cada sugestão de pauta, forneça:
   - Assunto (título curto e chamativo)
   - Resumo (2-3 frases explicando a notícia)
@@ -361,6 +375,259 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional.`;
 
           console.log(`✅ ${pautas.length} pautas sugeridas pela IA`);
           resolve(pautas);
+        } catch (error) {
+          console.error('❌ Erro ao parsear resposta da IA:', error);
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('❌ Erro na requisição OpenAI:', error);
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+/**
+ * Determina a categoria mais adequada para um post usando IA
+ * @param {Object} params - Parâmetros
+ * @param {string} params.titulo - Título do post
+ * @param {string} params.conteudo - Conteúdo do post
+ * @param {Array} params.categoriasDisponiveis - Array de categorias {id, nomePt, nomeEn, nomeEs}
+ * @returns {Promise<number|null>} - ID da categoria ou null se não conseguir determinar
+ */
+export async function categorizePostWithAI({ titulo, conteudo, categoriasDisponiveis }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY não configurada no .env');
+  }
+
+  const categoriasTexto = categoriasDisponiveis.map(cat => 
+    `- ID ${cat.id}: ${cat.nomePt} (${cat.nomeEn} / ${cat.nomeEs})`
+  ).join('\n');
+
+  const prompt = `Você é um editor especializado em categorização de notícias sobre música eletrônica.
+
+TÍTULO DA NOTÍCIA:
+${titulo}
+
+CONTEÚDO DA NOTÍCIA:
+${conteudo.substring(0, 2000)}
+
+CATEGORIAS DISPONÍVEIS:
+${categoriasTexto}
+
+TAREFA:
+Analise o título e conteúdo da notícia e determine qual categoria é mais adequada.
+Retorne APENAS o ID numérico da categoria escolhida (exemplo: 7).
+
+Se nenhuma categoria for adequada, retorne "null".
+
+FORMATO DE RESPOSTA:
+Apenas o número do ID ou "null", sem texto adicional.`;
+
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é um editor especializado. Sempre responda apenas com o ID numérico da categoria ou "null".'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 10
+    });
+
+    const options = {
+      hostname: 'api.openai.com',
+      port: 443,
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    console.log('🤖 Chamando OpenAI para categorizar post...');
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          if (res.statusCode !== 200) {
+            console.error('❌ OpenAI error:', data);
+            reject(new Error(`OpenAI retornou status ${res.statusCode}`));
+            return;
+          }
+
+          const response = JSON.parse(data);
+          const content = response.choices[0].message.content.trim();
+
+          let categoriaId = content
+            .replace(/```json\n?/g, '')
+            .replace(/```\n?/g, '')
+            .replace(/"/g, '')
+            .trim();
+
+          if (categoriaId.toLowerCase() === 'null' || categoriaId === '') {
+            console.log('⚠️  IA não conseguiu determinar categoria');
+            resolve(null);
+            return;
+          }
+
+          const id = parseInt(categoriaId);
+          if (isNaN(id)) {
+            console.warn('⚠️  Resposta da IA não é um número válido:', categoriaId);
+            resolve(null);
+            return;
+          }
+
+          const categoriaExiste = categoriasDisponiveis.some(cat => cat.id === id);
+          if (!categoriaExiste) {
+            console.warn(`⚠️  Categoria ID ${id} não existe nas categorias disponíveis`);
+            resolve(null);
+            return;
+          }
+
+          console.log(`✅ Categoria determinada: ID ${id}`);
+          resolve(id);
+        } catch (error) {
+          console.error('❌ Erro ao parsear resposta da IA:', error);
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('❌ Erro na requisição OpenAI:', error);
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+/**
+ * Gera tags relacionadas ao conteúdo usando IA
+ * @param {Object} params - Parâmetros
+ * @param {string} params.titulo - Título do post
+ * @param {string} params.conteudo - Conteúdo do post
+ * @param {number} params.quantidade - Quantidade de tags desejadas (padrão: 5)
+ * @returns {Promise<Array<string>>} - Array de tags geradas
+ */
+export async function generateTagsWithAI({ titulo, conteudo, quantidade = 5 }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY não configurada no .env');
+  }
+
+  const prompt = `Você é um editor especializado em música eletrônica.
+
+TÍTULO DA NOTÍCIA:
+${titulo}
+
+CONTEÚDO DA NOTÍCIA:
+${conteudo.substring(0, 2000)}
+
+TAREFA:
+Gere ${quantidade} tags relevantes relacionadas ao conteúdo da notícia.
+As tags devem ser:
+- Palavras-chave importantes do texto
+- Nomes de artistas, DJs, festivais mencionados
+- Gêneros musicais relacionados
+- Termos técnicos relevantes
+- Em português, minúsculas, sem acentos (ex: "edm", "festival", "tiesto", "house music")
+
+FORMATO DE RESPOSTA (JSON):
+{
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
+}
+
+Retorne APENAS o JSON, sem texto adicional.`;
+
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é um editor especializado. Sempre responda em JSON válido com array de tags.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 200
+    });
+
+    const options = {
+      hostname: 'api.openai.com',
+      port: 443,
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    console.log(`🤖 Chamando OpenAI para gerar ${quantidade} tags...`);
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          if (res.statusCode !== 200) {
+            console.error('❌ OpenAI error:', data);
+            reject(new Error(`OpenAI retornou status ${res.statusCode}`));
+            return;
+          }
+
+          const response = JSON.parse(data);
+          const content = response.choices[0].message.content;
+
+          let jsonString = content
+            .replace(/```json\n?/g, '')
+            .replace(/```\n?/g, '')
+            .trim();
+
+          const resultado = JSON.parse(jsonString);
+          const tags = resultado.tags || [];
+
+          const tagsLimpas = tags
+            .map(tag => tag.toLowerCase().trim())
+            .filter(tag => tag.length > 0 && tag.length <= 50)
+            .slice(0, quantidade);
+
+          console.log(`✅ ${tagsLimpas.length} tags geradas: ${tagsLimpas.join(', ')}`);
+          resolve(tagsLimpas);
         } catch (error) {
           console.error('❌ Erro ao parsear resposta da IA:', error);
           reject(error);

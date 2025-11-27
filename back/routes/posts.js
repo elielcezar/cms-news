@@ -564,6 +564,98 @@ router.get('/posts', async (req, res, next) => {
 });
 
 // Obter post pelo ID (público)
+// Obter post por ID para admin (protegido - retorna todos os status)
+router.get('/admin/posts/:id', authenticateToken, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const lang = req.query.lang || 'pt';
+
+        console.log(`📥 Recebendo requisição GET /admin/posts/${id} (ADMIN)`);
+
+        const post = await prisma.post.findFirst({
+            where: {
+                id: parseInt(id)
+                // SEM filtro de status - retorna todos
+            },
+            include: {
+                categorias: {
+                    include: {
+                        categoria: true
+                    }
+                },
+                tags: {
+                    include: {
+                        tag: true
+                    }
+                },
+                translations: true // Incluir todas as traduções
+            }
+        });
+        
+        if (!post) {
+            throw new NotFoundError('Post não encontrado');
+        }
+
+        // Encontrar tradução no idioma solicitado
+        const translation = post.translations.find(t => t.idioma === lang);
+        
+        // Para admin, retornar mesmo sem tradução (mas com campos vazios)
+        if (!translation) {
+            console.warn(`⚠️ Post #${post.id} não tem tradução em ${lang}`);
+            return res.json({
+                id: post.id,
+                titulo: '',
+                chamada: '',
+                conteudo: '',
+                urlAmigavel: '',
+                imagens: post.imagens || [],
+                status: post.status,
+                destaque: post.destaque,
+                dataPublicacao: post.dataPublicacao,
+                idiomaDefault: post.idiomaDefault,
+                createdAt: post.createdAt,
+                updatedAt: post.updatedAt,
+                categorias: post.categorias || [],
+                tags: post.tags || [],
+                translations: post.translations.map(t => ({
+                    idioma: t.idioma,
+                    titulo: t.titulo,
+                    urlAmigavel: t.urlAmigavel
+                }))
+            });
+        }
+
+        // Montar resposta com dados da tradução
+        const postCompleto = {
+            id: post.id,
+            titulo: translation.titulo,
+            chamada: translation.chamada,
+            conteudo: translation.conteudo,
+            urlAmigavel: translation.urlAmigavel,
+            imagens: post.imagens || [],
+            status: post.status,
+            destaque: post.destaque,
+            dataPublicacao: post.dataPublicacao,
+            idiomaDefault: post.idiomaDefault,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt,
+            categorias: post.categorias || [],
+            tags: post.tags || [],
+            translations: post.translations.map(t => ({
+                idioma: t.idioma,
+                titulo: t.titulo,
+                urlAmigavel: t.urlAmigavel
+            }))
+        };
+        
+        console.log(`✅ Post encontrado (ADMIN): ${postCompleto.titulo}`);
+        res.json(postCompleto);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Obter post por ID (público - apenas PUBLICADOS)
 router.get('/posts/id/:id', async (req, res, next) => {
     try {
         const { id } = req.params;

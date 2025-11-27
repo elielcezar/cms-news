@@ -16,12 +16,13 @@ export const postsService = {
   },
 
   /**
-   * Obter post por ID
+   * Obter post por ID (admin - retorna todos os status)
    */
   async getById(id: number, lang?: string): Promise<Post> {
     try {
       const params = lang ? { lang } : {};
-      const response = await apiClient.get<Post>(`/posts/id/${id}`, { params });
+      // Usar endpoint admin que retorna todos os posts
+      const response = await apiClient.get<Post>(`/admin/posts/${id}`, { params });
       return response.data;
     } catch (error) {
       throw new Error(handleApiError(error));

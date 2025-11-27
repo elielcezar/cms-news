@@ -4,7 +4,9 @@ import prisma from '../config/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { authenticateApiKey } from '../middleware/apiKeyAuth.js';
 import { validate, pautaCreateSchema } from '../middleware/validation.js';
-import { fetchContentWithJina, generateNewsWithAI, generateSlug, generatePautasWithAI } from '../services/aiService.js';
+import { fetchContentWithJina, fetchContentWithJinaAndMarkdown, generateNewsWithAI, generateSlug, generatePautasWithAI, categorizePostWithAI, generateTagsWithAI } from '../services/aiService.js';
+import { processImageFromSource } from '../services/imageService.js';
+import { getPlaceholderImageUrl } from '../utils/imagePlaceholder.js';
 
 const router = express.Router();
 
@@ -223,16 +225,16 @@ router.post('/pautas/:id/converter-em-post', authenticateToken, async (req, res,
         console.log(`📋 Pauta encontrada: "${pauta.assunto}"`);
         console.log(`🔗 ${pauta.fontes.length} fonte(s) para processar`);
 
-        // Buscar conteúdo de todas as fontes usando Jina AI
+        // Buscar conteúdo de todas as fontes usando Jina AI (com markdown para extração de imagens)
         const conteudosPromises = pauta.fontes.map(fonte => 
-            fetchContentWithJina(fonte.url).catch(err => {
+            fetchContentWithJinaAndMarkdown(fonte.url).catch(err => {
                 console.warn(`⚠️ Erro ao buscar ${fonte.url}:`, err.message);
-                return ''; // Retorna vazio se falhar
+                return null; // Retorna null se falhar
             })
         );
 
-        const conteudos = await Promise.all(conteudosPromises);
-        const conteudosValidos = conteudos.filter(c => c.length > 0);
+        const conteudosComMarkdown = await Promise.all(conteudosPromises);
+        const conteudosValidos = conteudosComMarkdown.filter(c => c !== null && c.content.length > 0);
 
         if (conteudosValidos.length === 0) {
             return res.status(400).json({ 
@@ -242,16 +244,122 @@ router.post('/pautas/:id/converter-em-post', authenticateToken, async (req, res,
 
         console.log(`✅ ${conteudosValidos.length} conteúdos obtidos com sucesso`);
 
+        // Extrair imagem da primeira fonte válida
+        let imagemUrl = null;
+        try {
+            console.log('🖼️  Tentando extrair imagem das fontes...');
+            
+            // Encontrar primeira fonte com conteúdo válido
+            for (let i = 0; i < pauta.fontes.length; i++) {
+                const fonte = pauta.fontes[i];
+                const conteudoComMarkdown = conteudosComMarkdown[i];
+                
+                if (conteudoComMarkdown && conteudoComMarkdown.content.length > 0) {
+                    imagemUrl = await processImageFromSource(
+                        fonte.url,
+                        conteudoComMarkdown.markdown
+                    );
+                    
+                    if (imagemUrl) {
+                        console.log(`✅ Imagem extraída e enviada para S3: ${imagemUrl}`);
+                        break; // Parar na primeira imagem encontrada
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('❌ Erro ao processar imagem (continuando sem imagem):', error.message);
+            // Não bloquear criação do post por erro de imagem
+        }
+
+        // Extrair apenas o conteúdo (sem markdown) para a IA
+        const conteudos = conteudosValidos.map(c => c.content);
+
         // Gerar notícia com IA em 3 idiomas
         console.log('🤖 Gerando notícias em 3 idiomas com IA...');
         const newsData = await generateNewsWithAI({
             assunto: pauta.assunto,
             resumo: pauta.resumo,
-            conteudos: conteudosValidos,
+            conteudos: conteudos,
             multilingual: true
         });
 
         console.log(`✅ Notícias geradas em PT, EN e ES`);
+
+        // Buscar categorias disponíveis para categorização automática
+        const categoriasDisponiveis = await prisma.categoria.findMany({
+            include: {
+                translations: true
+            }
+        });
+
+        // Preparar categorias no formato esperado pela IA
+        const categoriasFormatadas = categoriasDisponiveis.map(cat => {
+            const pt = cat.translations.find(t => t.idioma === 'pt');
+            const en = cat.translations.find(t => t.idioma === 'en');
+            const es = cat.translations.find(t => t.idioma === 'es');
+            return {
+                id: cat.id,
+                nomePt: pt?.nome || '',
+                nomeEn: en?.nome || '',
+                nomeEs: es?.nome || ''
+            };
+        });
+
+        // Categorizar post usando IA (usar versão PT)
+        let categoriaId = null;
+        try {
+            console.log('🏷️  Categorizando post com IA...');
+            categoriaId = await categorizePostWithAI({
+                titulo: newsData.pt.titulo,
+                conteudo: newsData.pt.conteudo,
+                categoriasDisponiveis: categoriasFormatadas
+            });
+            if (categoriaId) {
+                console.log(`✅ Categoria determinada: ID ${categoriaId}`);
+            } else {
+                console.log('⚠️  Nenhuma categoria foi determinada');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao categorizar post (continuando sem categoria):', error.message);
+        }
+
+        // Gerar tags usando IA (usar versão PT)
+        let tagsNomes = [];
+        try {
+            console.log('🏷️  Gerando tags com IA...');
+            tagsNomes = await generateTagsWithAI({
+                titulo: newsData.pt.titulo,
+                conteudo: newsData.pt.conteudo,
+                quantidade: 5
+            });
+            console.log(`✅ ${tagsNomes.length} tags geradas`);
+        } catch (error) {
+            console.error('❌ Erro ao gerar tags (continuando sem tags):', error.message);
+        }
+
+        // Criar ou buscar tags no banco de dados
+        const tagsIds = [];
+        for (const tagNome of tagsNomes) {
+            try {
+                // Tentar encontrar tag existente
+                let tag = await prisma.tag.findUnique({
+                    where: { nome: tagNome }
+                });
+
+                // Se não existe, criar
+                if (!tag) {
+                    tag = await prisma.tag.create({
+                        data: { nome: tagNome }
+                    });
+                    console.log(`   ✅ Tag criada: ${tagNome}`);
+                }
+
+                tagsIds.push(tag.id);
+            } catch (error) {
+                console.warn(`⚠️  Erro ao processar tag "${tagNome}":`, error.message);
+                // Continuar com outras tags mesmo se uma falhar
+            }
+        }
 
         // Gerar slugs únicos para cada idioma
         const slugs = {};
@@ -272,14 +380,28 @@ router.post('/pautas/:id/converter-em-post', authenticateToken, async (req, res,
             console.log(`   📝 Slug ${idioma.toUpperCase()}: ${slugFinal}`);
         }
 
+        // Preparar array de imagens (sempre incluir imagem - extraída ou placeholder)
+        // Se não encontrou imagem, usar placeholder padrão
+        const imagens = imagemUrl ? [imagemUrl] : [getPlaceholderImageUrl()];
+
+        // Preparar dados de categorias e tags para criação
+        const categoriasData = categoriaId ? [{ categoriaId: categoriaId }] : [];
+        const tagsData = tagsIds.map(tagId => ({ tagId: tagId }));
+
         // Criar post base (sem campos de conteúdo)
         const post = await prisma.post.create({
             data: {
                 status: 'RASCUNHO',
                 destaque: false,
-                imagens: [],
+                imagens: imagens,
                 idiomaDefault: 'pt',
                 dataPublicacao: new Date(),
+                categorias: {
+                    create: categoriasData
+                },
+                tags: {
+                    create: tagsData
+                },
                 translations: {
                     create: idiomas.map(idioma => ({
                         idioma: idioma,
