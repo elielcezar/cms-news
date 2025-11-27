@@ -9,16 +9,16 @@ import http from 'http';
 export async function fetchContentWithJina(url) {
   return new Promise((resolve, reject) => {
     const jinaUrl = `https://r.jina.ai/${url}`;
-    
+
     console.log(`🔍 Buscando conteúdo: ${url}`);
-    
+
     https.get(jinaUrl, (res) => {
       let data = '';
-      
+
       res.on('data', (chunk) => {
         data += chunk;
       });
-      
+
       res.on('end', () => {
         if (res.statusCode === 200) {
           console.log(`✅ Conteúdo obtido (${data.length} chars)`);
@@ -59,7 +59,7 @@ export async function fetchContentWithJinaAndMarkdown(url) {
 export async function generateNewsWithAI({ assunto, resumo, conteudos, multilingual = false }) {
   // Verifica se tem OpenAI configurada
   const apiKey = process.env.OPENAI_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY não configurada no .env');
   }
@@ -146,7 +146,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
       messages: [
         {
           role: 'system',
-          content: multilingual 
+          content: multilingual
             ? 'Você é um redator profissional de notícias multilíngue. Sempre responda em JSON válido com as 3 versões (pt, en, es).'
             : 'Você é um redator profissional de notícias. Sempre responda em JSON válido.'
         },
@@ -208,7 +208,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
           } else {
             console.log('✅ Notícia gerada com sucesso!');
           }
-          
+
           resolve(newsData);
         } catch (error) {
           console.error('❌ Erro ao parsear resposta da IA:', error);
@@ -249,7 +249,7 @@ export function generateSlug(text) {
  */
 export async function generatePautasWithAI(fontes) {
   const apiKey = process.env.OPENAI_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY não configurada no .env');
   }
@@ -257,7 +257,7 @@ export async function generatePautasWithAI(fontes) {
   console.log(`📋 Processando ${fontes.length} fontes...`);
 
   // Buscar conteúdo de todas as fontes usando Jina AI
-  const conteudosPromises = fontes.map(fonte => 
+  const conteudosPromises = fontes.map(fonte =>
     fetchContentWithJina(fonte.url)
       .then(conteudo => ({
         titulo: fonte.titulo,
@@ -279,8 +279,8 @@ export async function generatePautasWithAI(fontes) {
   console.log(`✅ ${conteudos.length} conteúdos obtidos com sucesso`);
 
   // Montar prompt para OpenAI
-  const conteudosTexto = conteudos.map((item, i) => 
-    `## Fonte ${i+1}: ${item.titulo}\nURL: ${item.url}\n\n${item.conteudo}\n\n---\n`
+  const conteudosTexto = conteudos.map((item, i) =>
+    `## Fonte ${i + 1}: ${item.titulo}\nURL: ${item.url}\n\n${item.conteudo}\n\n---\n`
   ).join('');
 
   const prompt = `Você é um editor de notícias especializado em música eletrônica.
@@ -402,12 +402,12 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional.`;
  */
 export async function categorizePostWithAI({ titulo, conteudo, categoriasDisponiveis }) {
   const apiKey = process.env.OPENAI_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY não configurada no .env');
   }
 
-  const categoriasTexto = categoriasDisponiveis.map(cat => 
+  const categoriasTexto = categoriasDisponiveis.map(cat =>
     `- ID ${cat.id}: ${cat.nomePt} (${cat.nomeEn} / ${cat.nomeEs})`
   ).join('\n');
 
@@ -426,7 +426,13 @@ TAREFA:
 Analise o título e conteúdo da notícia e determine qual categoria é mais adequada.
 Retorne APENAS o ID numérico da categoria escolhida (exemplo: 7).
 
-Se nenhuma categoria for adequada, retorne "null".
+Se a notícia falar sobre inteligencia artificial, serviços ou sites de música como spotify, soundcloud, etc, classifique na categoria Tecnologia.
+
+Se a notícia falar sobre algum artista da latino, marque como América Latina.
+
+Se a notícia falar sobre um evento, festival ou show, marque na categoria Festival.
+
+Se nenhuma categoria for adequada, marque como Mundo.
 
 FORMATO DE RESPOSTA:
 Apenas o número do ID ou "null", sem texto adicional.`;
@@ -535,7 +541,7 @@ Apenas o número do ID ou "null", sem texto adicional.`;
  */
 export async function generateTagsWithAI({ titulo, conteudo, quantidade = 5 }) {
   const apiKey = process.env.OPENAI_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY não configurada no .env');
   }
