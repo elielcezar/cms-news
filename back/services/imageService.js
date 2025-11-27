@@ -8,30 +8,120 @@ const AWS_S3_BUCKET = process.env.AWS_S3_BUCKET;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 
+// Palavras-chave que indicam logos/branding (para filtrar)
+const LOGO_KEYWORDS = ['logo', 'brand', 'cropped', 'icon', 'favicon', 'avatar', 'thumbnail-', '-96x96', '-48x48', '-32x32'];
+
+// Blacklist de padrões de URL específicos conhecidos
+const URL_BLACKLIST = [
+  /cropped-.*-removebg-preview/i, // Padrão do edm.com
+  /logo.*\.(png|jpg|jpeg|svg)/i,
+  /favicon/i,
+  /icon.*\.(png|jpg|jpeg|svg)/i,
+];
+
 /**
- * Extrai a URL da imagem og:image de um HTML
+ * Valida se uma URL de imagem parece ser um logo/branding
+ * @param {string} imageUrl - URL da imagem
+ * @returns {boolean} - true se parece ser logo, false caso contrário
+ */
+function isLikelyLogo(imageUrl) {
+  if (!imageUrl) return true;
+
+  const urlLower = imageUrl.toLowerCase();
+
+  // Verificar blacklist de padrões
+  for (const pattern of URL_BLACKLIST) {
+    if (pattern.test(imageUrl)) {
+      console.log(`   🚫 URL bloqueada por padrão: ${imageUrl}`);
+      return true;
+    }
+  }
+
+  // Verificar palavras-chave suspeitas
+  for (const keyword of LOGO_KEYWORDS) {
+    if (urlLower.includes(keyword)) {
+      console.log(`   🚫 URL parece ser logo (contém "${keyword}"): ${imageUrl}`);
+      return true;
+    }
+  }
+
+  // Verificar dimensões suspeitas no nome do arquivo (ex: -300x114.png)
+  const dimensionMatch = imageUrl.match(/-(\d+)x(\d+)\.(png|jpg|jpeg|webp)$/i);
+  if (dimensionMatch) {
+    const width = parseInt(dimensionMatch[1]);
+    const height = parseInt(dimensionMatch[2]);
+    const ratio = width / height;
+
+    // Logos geralmente são muito largos ou muito altos (ratio muito alto ou muito baixo)
+    // ou muito pequenos
+    if (width < 200 || height < 200 || ratio > 5 || ratio < 0.2) {
+      console.log(`   🚫 Dimensões suspeitas (${width}x${height}): ${imageUrl}`);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Extrai todas as URLs de og:image do HTML e retorna a melhor (não-logo)
  * @param {string} html - HTML da página
  * @param {string} baseUrl - URL base para resolver URLs relativas
- * @returns {string|null} - URL da imagem ou null se não encontrada
+ * @returns {string|null} - URL da melhor imagem ou null se não encontrada
  */
 export function extractOgImage(html, baseUrl) {
   try {
-    // Buscar og:image em diferentes formatos
+    // Buscar todas as ocorrências de og:image
     const patterns = [
-      /<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i,
-      /<meta\s+content=["']([^"']+)["']\s+property=["']og:image["']/i,
-      /<meta\s+name=["']og:image["']\s+content=["']([^"']+)["']/i,
+      /<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/gi,
+      /<meta\s+content=["']([^"']+)["']\s+property=["']og:image["']/gi,
+      /<meta\s+name=["']og:image["']\s+content=["']([^"']+)["']/gi,
     ];
 
+    const foundImages = [];
+
     for (const pattern of patterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        const imageUrl = match[1].trim();
-        return resolveUrl(imageUrl, baseUrl);
+      const matches = [...html.matchAll(pattern)];
+      for (const match of matches) {
+        const imageUrl = match[1]?.trim();
+        if (imageUrl) {
+          const resolvedUrl = resolveUrl(imageUrl, baseUrl);
+          if (resolvedUrl) {
+            foundImages.push(resolvedUrl);
+          }
+        }
       }
     }
 
-    return null;
+    if (foundImages.length === 0) {
+      return null;
+    }
+
+    // Se houver apenas uma, retornar (mas validar se não é logo)
+    if (foundImages.length === 1) {
+      const url = foundImages[0];
+      if (isLikelyLogo(url)) {
+        console.log(`   ⚠️  Única imagem encontrada parece ser logo, mas será usada: ${url}`);
+        // Mesmo sendo logo, retornar se for a única opção
+        return url;
+      }
+      return url;
+    }
+
+    // Se houver múltiplas, filtrar logos e escolher a melhor
+    console.log(`   📋 Encontradas ${foundImages.length} imagens og:image`);
+    
+    const validImages = foundImages.filter(url => !isLikelyLogo(url));
+    
+    if (validImages.length > 0) {
+      // Retornar a primeira imagem válida (não-logo)
+      console.log(`   ✅ Escolhida imagem válida: ${validImages[0]}`);
+      return validImages[0];
+    }
+
+    // Se todas parecem ser logos, retornar a primeira mesmo assim
+    console.log(`   ⚠️  Todas as imagens parecem ser logos, usando a primeira: ${foundImages[0]}`);
+    return foundImages[0];
   } catch (error) {
     console.error('❌ Erro ao extrair og:image:', error.message);
     return null;
@@ -39,10 +129,10 @@ export function extractOgImage(html, baseUrl) {
 }
 
 /**
- * Extrai a primeira imagem do markdown
+ * Extrai a primeira imagem válida do markdown (filtrando logos)
  * @param {string} markdown - Conteúdo em markdown
  * @param {string} baseUrl - URL base para resolver URLs relativas
- * @returns {string|null} - URL da primeira imagem ou null se não encontrada
+ * @returns {string|null} - URL da primeira imagem válida ou null se não encontrada
  */
 export function extractImageFromMarkdown(markdown, baseUrl) {
   try {
@@ -52,18 +142,36 @@ export function extractImageFromMarkdown(markdown, baseUrl) {
       /<img[^>]+src=["']([^"']+)["']/gi, // <img src="url">
     ];
 
+    const foundImages = [];
+
     for (const pattern of patterns) {
       const matches = [...markdown.matchAll(pattern)];
-      if (matches.length > 0) {
-        // Pegar primeira imagem encontrada
-        const imageUrl = matches[0][2] || matches[0][1]; // Segundo grupo para markdown, primeiro para HTML
+      for (const match of matches) {
+        const imageUrl = match[2] || match[1]; // Segundo grupo para markdown, primeiro para HTML
         if (imageUrl) {
-          return resolveUrl(imageUrl.trim(), baseUrl);
+          const resolvedUrl = resolveUrl(imageUrl.trim(), baseUrl);
+          if (resolvedUrl) {
+            foundImages.push(resolvedUrl);
+          }
         }
       }
     }
 
-    return null;
+    if (foundImages.length === 0) {
+      return null;
+    }
+
+    // Filtrar logos e retornar primeira imagem válida
+    const validImages = foundImages.filter(url => !isLikelyLogo(url));
+    
+    if (validImages.length > 0) {
+      console.log(`   ✅ Imagem válida encontrada no markdown: ${validImages[0]}`);
+      return validImages[0];
+    }
+
+    // Se todas parecem ser logos, retornar a primeira mesmo assim
+    console.log(`   ⚠️  Todas as imagens do markdown parecem ser logos, usando a primeira: ${foundImages[0]}`);
+    return foundImages[0];
   } catch (error) {
     console.error('❌ Erro ao extrair imagem do markdown:', error.message);
     return null;

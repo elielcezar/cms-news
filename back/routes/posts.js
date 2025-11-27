@@ -831,14 +831,29 @@ router.put('/posts/:id', authenticateToken, handleMulterError(uploadS3.array('im
         }
 
         // Processar imagens (armazenadas no post base)
-        let imagens = postExistente.imagens || [];
-        if (oldImages) {
-            imagens = JSON.parse(oldImages);
+        let imagens = [];
+        
+        // Se oldImages foi enviado (mesmo que vazio), usar esse valor
+        // Isso permite remover todas as imagens ao enviar array vazio
+        if (oldImages !== undefined) {
+            try {
+                imagens = JSON.parse(oldImages);
+            } catch (error) {
+                console.warn('⚠️  Erro ao parsear oldImages, usando imagens existentes:', error.message);
+                imagens = postExistente.imagens || [];
+            }
+        } else {
+            // Se oldImages não foi enviado, manter imagens existentes
+            imagens = postExistente.imagens || [];
         }
+        
+        // Adicionar novas imagens enviadas
         if (req.files && req.files.length > 0) {
             const novasImagens = req.files.map(file => file.location);
             imagens = [...imagens, ...novasImagens];
         }
+        
+        console.log(`📸 Imagens processadas: ${imagens.length} total (${req.files?.length || 0} novas)`);
 
         // Atualizar dados do post base
         const dataPost = {

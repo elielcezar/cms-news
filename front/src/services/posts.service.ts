@@ -112,9 +112,9 @@ export const postsService = {
         formData.append('tags', JSON.stringify(data.tags || []));
       }
 
-      // Adicionar imagens antigas (manter)
-      if (data.oldImages && data.oldImages.length > 0) {
-        formData.append('oldImages', JSON.stringify(data.oldImages));
+      // Adicionar imagens antigas (sempre enviar, mesmo se vazio, para permitir remoção)
+      if (data.oldImages !== undefined) {
+        formData.append('oldImages', JSON.stringify(data.oldImages || []));
       }
 
       // Adicionar novas imagens

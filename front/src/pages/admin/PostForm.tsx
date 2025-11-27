@@ -215,6 +215,7 @@ export default function PostForm() {
         ...formData,
         categorias: selectedCategorias || [], // Sempre enviar array, mesmo se vazio
         tags: tagIds || [], // Sempre enviar array, mesmo se vazio
+        oldImages: formData.oldImages || [], // Sempre enviar array, mesmo se vazio (permite remover imagens)
       };
 
       console.log('📤 Enviando formulário com dados:', dataToSubmit);
@@ -289,10 +290,11 @@ export default function PostForm() {
     }
 
     // Substituir imagem (apenas 1)
+    // Limpar oldImages para que o backend substitua todas as imagens antigas pela nova
     setFormData(prev => ({
       ...prev,
       imagens: [file],
-      oldImages: [], // Limpar imagem antiga
+      oldImages: [], // Array vazio indica que queremos substituir todas as imagens antigas
     }));
 
     // Criar preview
