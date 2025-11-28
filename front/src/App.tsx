@@ -20,6 +20,7 @@ import CategoriaForm from "./pages/admin/CategoriaForm";
 import Tags from "./pages/admin/Tags";
 import TagForm from "./pages/admin/TagForm";
 import Pautas from "./pages/admin/Pautas";
+import Feed from "./pages/admin/Feed";
 import Fontes from "./pages/admin/Fontes";
 import FonteForm from "./pages/admin/FonteForm";
 import Users from "./pages/admin/Users";
@@ -53,6 +54,7 @@ const App = () => (
                   <Route path="posts/novo" element={<PostForm />} />
                   <Route path="posts/:id/editar" element={<PostForm />} />
                   <Route path="pautas" element={<Pautas />} />
+                  <Route path="feed" element={<Feed />} />
                   <Route path="fontes" element={<Fontes />} />
                   <Route path="fontes/novo" element={<FonteForm />} />
                   <Route path="fontes/:id/editar" element={<FonteForm />} />

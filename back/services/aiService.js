@@ -291,10 +291,14 @@ CONTEÚDOS:
 ${conteudosTexto}
 
 INSTRUÇÕES:
-- Identifique notícias interessantes dos últimos 7 dias
-- Se o mesmo assunto aparecer em mais de uma fonte, marque-o adicioando a tag [IMPORTANTE] no começo do assunto.
+- Identifique as 10 notícias mais recentes de cada fonte, e envie como sugestão de pauta.
+- Não envie sugestões de pauta que já foram enviadas anteriormente.
+- Não envie sugestões de pauta que não tenham notícias recentes (até 7 dias).
+- Procure enviar o máximo de sugestões possivel até um limite de 40 sugestões no total.
+- Procure variar os assuntos e fontes para manter a diversidade.
+- Se o mesmo assunto aparecer em mais de uma fonte, transforme-o em uma sugestão de pauta única, marcando-o com a tag [IMPORTANTE] no começo do assunto.
 - Para cada sugestão de pauta, forneça:
-  - Assunto (título curto e chamativo)
+  - Assunto (título curto e explicativo)
   - Resumo (2-3 frases explicando a notícia)
   - Fontes (lista com nome e URL de onde veio a informação)
 
@@ -328,8 +332,8 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional.`;
           content: prompt
         }
       ],
-      temperature: 0.7,
-      max_tokens: 2000
+      temperature: 0.3,
+      max_tokens: 4000
     });
 
     const options = {
@@ -782,6 +786,166 @@ Retorne APENAS o JSON, sem texto adicional.`;
 
           console.log(`✅ Traduções geradas com sucesso para ${idiomasAlvo.map(l => l.toUpperCase()).join(' e ')}`);
           resolve(translations);
+        } catch (error) {
+          console.error('❌ Erro ao parsear resposta da IA:', error);
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('❌ Erro na requisição OpenAI:', error);
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+/**
+ * Extrai itens de feed (notícias) de uma página de listagem usando IA
+ * @param {Object} params - Parâmetros
+ * @param {string} params.fonteUrl - URL base da fonte (para resolver URLs relativas)
+ * @param {string} params.fonteTitulo - Título da fonte
+ * @param {string} params.conteudoJina - Conteúdo extraído pelo Jina AI Reader
+ * @param {number} params.limite - Limite de notícias a extrair (padrão: 10)
+ * @returns {Promise<Array>} - Array de itens do feed [{titulo, url, chamada?, imagemUrl?, dataPublicacao?}]
+ */
+export async function extractFeedItemsWithAI({ fonteUrl, fonteTitulo, conteudoJina, limite = 10 }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY não configurada no .env');
+  }
+
+  // Extrair domínio base para resolver URLs relativas
+  const urlObj = new URL(fonteUrl);
+  const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+
+  const prompt = `Você é um parser de notícias especializado em extrair informações estruturadas de páginas de listagem de notícias.
+
+FONTE: ${fonteTitulo}
+URL BASE: ${baseUrl}
+
+CONTEÚDO DA PÁGINA (extraído via Jina AI Reader):
+${conteudoJina.substring(0, 15000)}
+
+TAREFA:
+Analise o conteúdo acima e extraia as ${limite} notícias mais recentes encontradas na página.
+
+Para cada notícia, extraia:
+1. **titulo** (obrigatório): O título da notícia
+2. **url** (obrigatório): Link completo para a notícia (se for relativo, combine com a URL base)
+3. **chamada** (opcional): Resumo/subtítulo se disponível
+4. **imagemUrl** (opcional): URL da imagem de capa se encontrada
+5. **dataPublicacao** (opcional): Data de publicação no formato ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ) se disponível
+
+REGRAS:
+- Extraia APENAS notícias reais, não menus, links de navegação ou anúncios
+- URLs devem ser absolutas (começando com http:// ou https://)
+- Se a URL for relativa (ex: /news/artigo), combine com a URL base: ${baseUrl}
+- Não invente informações - se não encontrar, deixe o campo vazio ou null
+- Priorize notícias mais recentes
+- Retorne no máximo ${limite} itens
+
+FORMATO DE RESPOSTA (JSON):
+{
+  "items": [
+    {
+      "titulo": "Título da notícia",
+      "url": "https://exemplo.com/noticia-completa",
+      "chamada": "Resumo ou subtítulo (opcional)",
+      "imagemUrl": "https://exemplo.com/imagem.jpg (opcional)",
+      "dataPublicacao": "2025-01-15T10:30:00.000Z (opcional)"
+    }
+  ]
+}
+
+Retorne APENAS o JSON, sem texto adicional.`;
+
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é um parser de notícias especializado. Sempre responda em JSON válido com array de items extraídos.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.2, // Baixa temperatura para extração mais precisa
+      max_tokens: 4000
+    });
+
+    const options = {
+      hostname: 'api.openai.com',
+      port: 443,
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    console.log(`🔍 Extraindo até ${limite} notícias de ${fonteTitulo}...`);
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          if (res.statusCode !== 200) {
+            console.error('❌ OpenAI error:', data);
+            reject(new Error(`OpenAI retornou status ${res.statusCode}`));
+            return;
+          }
+
+          const response = JSON.parse(data);
+          const content = response.choices[0].message.content;
+
+          // Remove marcadores de código markdown se houver
+          let jsonString = content
+            .replace(/```json\n?/g, '')
+            .replace(/```\n?/g, '')
+            .trim();
+
+          const resultado = JSON.parse(jsonString);
+          const items = resultado.items || [];
+
+          // Validar e limpar items
+          const itemsValidos = items
+            .filter(item => item.titulo && item.url)
+            .map(item => ({
+              titulo: item.titulo.trim(),
+              url: item.url.trim(),
+              chamada: item.chamada?.trim() || null,
+              imagemUrl: item.imagemUrl?.trim() || null,
+              dataPublicacao: item.dataPublicacao ? new Date(item.dataPublicacao) : null
+            }))
+            .filter(item => {
+              // Validar URL
+              try {
+                new URL(item.url);
+                return true;
+              } catch {
+                console.warn(`⚠️ URL inválida ignorada: ${item.url}`);
+                return false;
+              }
+            })
+            .slice(0, limite);
+
+          console.log(`✅ ${itemsValidos.length} notícias extraídas de ${fonteTitulo}`);
+          resolve(itemsValidos);
         } catch (error) {
           console.error('❌ Erro ao parsear resposta da IA:', error);
           reject(error);

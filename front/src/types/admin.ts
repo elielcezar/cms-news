@@ -34,6 +34,44 @@ export interface FonteFormData {
   url: string;
 }
 
+// FeedItem (Notícia extraída de uma fonte)
+export interface FeedItem {
+  id: number;
+  fonteId: number;
+  titulo: string;
+  url: string;
+  chamada: string | null;
+  imagemUrl: string | null;
+  dataPublicacao: string | null;
+  lida: boolean;
+  createdAt: string;
+  updatedAt: string;
+  fonte?: {
+    id: number;
+    titulo: string;
+    url: string;
+  };
+}
+
+// Resposta paginada de FeedItems
+export interface FeedItemsResponse {
+  items: FeedItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+}
+
+// Fonte com contagem de items para filtro
+export interface FonteComContagem {
+  id: number;
+  titulo: string;
+  totalItems: number;
+}
+
 // Categoria
 export interface Categoria {
   id: number;

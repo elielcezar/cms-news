@@ -14,7 +14,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 
-import { FileText, Users, LogOut, LayoutDashboard, User, Tags, FolderOpen, Lightbulb, Rss } from 'lucide-react';
+import { FileText, Users, LogOut, LayoutDashboard, User, Tags, FolderOpen, Lightbulb, Rss, Newspaper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 
@@ -22,6 +22,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
   const menuItems = [
     { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
     { title: 'Posts', url: '/admin/posts', icon: FileText },
+    { title: 'Leitor de Feed', url: '/admin/feed', icon: Newspaper },
     { title: 'Sugestões de Pauta', url: '/admin/pautas', icon: Lightbulb },
     { title: 'Fontes', url: '/admin/fontes', icon: Rss },
     { title: 'Categorias', url: '/admin/categorias', icon: FolderOpen },

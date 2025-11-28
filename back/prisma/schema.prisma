@@ -136,12 +136,33 @@ model Pauta {
 }
 
 model Fonte {
-  id        Int      @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   titulo    String
   url       String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  feedItems FeedItem[]
 
   @@map("fontes")
   @@index([url])
+}
+
+model FeedItem {
+  id             Int       @id @default(autoincrement())
+  fonteId        Int
+  titulo         String
+  url            String    @unique // URL única para evitar duplicatas
+  chamada        String?   @db.Text // Resumo/chamada (opcional)
+  imagemUrl      String?   // URL da imagem de capa (opcional)
+  dataPublicacao DateTime? // Data de publicação da notícia (se disponível)
+  lida           Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  fonte          Fonte     @relation(fields: [fonteId], references: [id], onDelete: Cascade)
+
+  @@map("feed_items")
+  @@index([fonteId])
+  @@index([createdAt])
+  @@index([lida])
+  @@index([dataPublicacao])
 }

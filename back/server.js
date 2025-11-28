@@ -7,6 +7,7 @@ import loginRoutes from './routes/login.js';
 import categoriasRoutes from './routes/categorias.js';
 import tagsRoutes from './routes/tags.js';
 import pautasRoutes from './routes/pautas.js';
+import feedRoutes from './routes/feed.js';
 import fontesRoutes from './routes/fontes.js';
 import uploadRoutes from './routes/upload.js';
 import sitemapRoutes from './routes/sitemap.js';
@@ -70,6 +71,7 @@ app.use('/api', postsRoutes);
 app.use('/api', categoriasRoutes);
 app.use('/api', tagsRoutes);
 app.use('/api', pautasRoutes);
+app.use('/api', feedRoutes);
 app.use('/api', fontesRoutes);
 app.use('/api', uploadRoutes);
 
