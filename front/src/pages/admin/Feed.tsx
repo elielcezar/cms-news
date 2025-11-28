@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { feedService, FeedFilters } from '@/services/feed.service';
 import { FeedItem, FonteComContagem } from '@/types/admin';
@@ -26,7 +27,8 @@ import {
   CheckCheck,
   RefreshCw,
   Calendar,
-  Image as ImageIcon
+  Image as ImageIcon,
+  FileEdit
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -39,7 +41,9 @@ export default function Feed() {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [convertingItemId, setConvertingItemId] = useState<number | null>(null);
   const selectAllCheckboxRef = useRef<HTMLButtonElement & { indeterminate?: boolean }>(null);
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -143,6 +147,28 @@ export default function Feed() {
     },
   });
 
+  // Mutation para converter em post
+  const convertToPost = useMutation({
+    mutationFn: (id: number) => feedService.convertToPost(id),
+    onSuccess: (data) => {
+      setConvertingItemId(null);
+      toast({
+        title: 'Post criado com sucesso!',
+        description: 'A notícia foi gerada pela IA e salva como rascunho.',
+      });
+      // Redirecionar para edição do post
+      navigate(`/admin/posts/${data.postId}/editar`);
+    },
+    onError: (error: Error) => {
+      setConvertingItemId(null);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao converter item',
+        description: error.message || 'Não foi possível gerar a notícia com IA.',
+      });
+    },
+  });
+
   const items = feedData?.items || [];
   const pagination = feedData?.pagination;
 
@@ -198,6 +224,20 @@ export default function Feed() {
       markAsRead.mutate(item.id);
     }
     window.open(item.url, '_blank');
+  };
+
+  // Handler para converter em post
+  const handleConvertToPost = (itemId: number) => {
+    if (convertToPost.isPending) return; // Evitar múltiplos cliques
+
+    setConvertingItemId(itemId); // Define qual item está sendo convertido
+
+    toast({
+      title: 'Gerando notícia...',
+      description: 'A IA está criando uma notícia completa baseada no item. Isso pode levar alguns segundos.',
+    });
+
+    convertToPost.mutate(itemId);
   };
 
   // Formatar data
@@ -438,10 +478,25 @@ export default function Feed() {
           {items.map((item) => (
             <Card
               key={item.id}
-              className={`overflow-hidden transition-all hover:shadow-lg group ${
-                !item.lida ? 'border-primary/50 bg-primary/5' : ''
+              className={`relative overflow-hidden transition-all hover:shadow-lg group ${
+                convertingItemId === item.id
+                  ? 'ring-2 ring-primary shadow-lg scale-[1.02] z-10'
+                  : convertingItemId !== null
+                  ? 'opacity-40 pointer-events-none'
+                  : !item.lida
+                  ? 'border-primary/50 bg-primary/5'
+                  : ''
               } ${selectedIds.has(item.id) ? 'ring-2 ring-primary' : ''}`}
             >
+              {convertingItemId === item.id && (
+                <div className="absolute inset-0 bg-primary/5 rounded-lg flex items-center justify-center z-20">
+                  <div className="flex flex-col items-center gap-2 bg-background/95 p-4 rounded-lg shadow-lg border">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm font-medium">Gerando notícia com IA...</p>
+                    <p className="text-xs text-muted-foreground">Aguarde alguns segundos</p>
+                  </div>
+                </div>
+              )}
               {/* Imagem */}
               <div 
                 className="relative h-40 bg-muted cursor-pointer overflow-hidden"
@@ -521,10 +576,29 @@ export default function Feed() {
                     variant="default"
                     size="sm"
                     className="flex-1"
-                    onClick={() => handleOpenLink(item)}
+                    onClick={() => handleConvertToPost(item.id)}
+                    disabled={convertingItemId !== null || convertToPost.isPending}
                   >
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Abrir
+                    {convertingItemId === item.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <FileEdit className="h-4 w-4 mr-1" />
+                        Converter
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenLink(item)}
+                    disabled={convertingItemId !== null}
+                    title="Abrir link original"
+                  >
+                    <ExternalLink className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
@@ -536,6 +610,7 @@ export default function Feed() {
                         markAsRead.mutate(item.id);
                       }
                     }}
+                    disabled={convertingItemId !== null}
                     title={item.lida ? 'Já lida' : 'Marcar como lida'}
                   >
                     {item.lida ? (
@@ -552,7 +627,7 @@ export default function Feed() {
                         deleteFeedItem.mutate(item.id);
                       }
                     }}
-                    disabled={deleteFeedItem.isPending}
+                    disabled={deleteFeedItem.isPending || convertingItemId !== null}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

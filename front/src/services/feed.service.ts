@@ -118,5 +118,19 @@ export const feedService = {
       throw new Error(handleApiError(error));
     }
   },
+
+  /**
+   * Converter feed item em post usando IA
+   */
+  async convertToPost(id: number): Promise<{ postId: number; message: string }> {
+    try {
+      const response = await apiClient.post<{ postId: number; message: string }>(
+        `/feed/${id}/converter-em-post`
+      );
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
 };
 
