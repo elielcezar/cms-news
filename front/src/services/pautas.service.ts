@@ -74,5 +74,17 @@ export const pautasService = {
       throw new Error(handleApiError(error));
     }
   },
+
+  /**
+   * Criar pauta manualmente
+   */
+  async create(data: { assunto: string; resumo: string; fontes: Array<{ nome: string; url: string }> }): Promise<Pauta> {
+    try {
+      const response = await apiClient.post<Pauta>('/pautas/manual', data);
+      return response.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
 };
 

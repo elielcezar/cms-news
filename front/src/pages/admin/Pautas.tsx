@@ -15,19 +15,29 @@ import {
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Eye, Trash2, Loader2, FileEdit, ExternalLink, Search, Sparkles } from 'lucide-react';
+import { Eye, Trash2, Loader2, FileEdit, ExternalLink, Search, Sparkles, Plus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 export default function Pautas() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPauta, setSelectedPauta] = useState<Pauta | null>(null);
   const [convertingPautaId, setConvertingPautaId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const selectAllCheckboxRef = useRef<HTMLButtonElement & { indeterminate?: boolean }>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Estados do formulário de criação manual
+  const [assunto, setAssunto] = useState('');
+  const [resumo, setResumo] = useState('');
+  const [fontes, setFontes] = useState<Array<{ nome: string; url: string }>>([
+    { nome: '', url: '' }
+  ]);
 
   // Buscar pautas
   const { data: pautas, isLoading } = useQuery({
@@ -102,6 +112,31 @@ export default function Pautas() {
       toast({
         variant: 'destructive',
         title: 'Erro ao buscar pautas',
+        description: error.message,
+      });
+    },
+  });
+
+  // Mutation para criar pauta manualmente
+  const createPauta = useMutation({
+    mutationFn: (data: { assunto: string; resumo: string; fontes: Array<{ nome: string; url: string }> }) =>
+      pautasService.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pautas'] });
+      toast({
+        title: 'Pauta criada',
+        description: 'A sugestão de pauta foi criada com sucesso.',
+      });
+      // Limpar formulário e fechar dialog
+      setAssunto('');
+      setResumo('');
+      setFontes([{ nome: '', url: '' }]);
+      setIsCreateDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao criar pauta',
         description: error.message,
       });
     },
@@ -220,6 +255,82 @@ export default function Pautas() {
     return text.substring(0, maxLength) + '...';
   };
 
+  // Handlers do formulário de criação manual
+  const handleAddFonte = () => {
+    setFontes([...fontes, { nome: '', url: '' }]);
+  };
+
+  const handleRemoveFonte = (index: number) => {
+    if (fontes.length > 1) {
+      setFontes(fontes.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleFonteChange = (index: number, field: 'nome' | 'url', value: string) => {
+    const newFontes = [...fontes];
+    newFontes[index][field] = value;
+    setFontes(newFontes);
+  };
+
+  const handleSubmitManual = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validações
+    if (!assunto.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Campo obrigatório',
+        description: 'O assunto é obrigatório.',
+      });
+      return;
+    }
+
+    if (!resumo.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Campo obrigatório',
+        description: 'O resumo é obrigatório.',
+      });
+      return;
+    }
+
+    // Validar fontes
+    const fontesValidas = fontes.filter(f => f.nome.trim() && f.url.trim());
+    if (fontesValidas.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Campo obrigatório',
+        description: 'Adicione pelo menos uma fonte válida (nome e URL).',
+      });
+      return;
+    }
+
+    // Validar URLs
+    const urlsInvalidas = fontesValidas.filter(f => {
+      try {
+        new URL(f.url);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+
+    if (urlsInvalidas.length > 0) {
+      toast({
+        variant: 'destructive',
+        title: 'URL inválida',
+        description: 'Verifique se todas as URLs estão no formato correto (ex: https://exemplo.com).',
+      });
+      return;
+    }
+
+    createPauta.mutate({
+      assunto: assunto.trim(),
+      resumo: resumo.trim(),
+      fontes: fontesValidas,
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -231,42 +342,73 @@ export default function Pautas() {
         </div>
       </div>
 
-      {/* Botão Buscar Pautas - Destaque */}
-      <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-primary/10">
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-primary/10">
-                <Sparkles className="h-5 w-5 text-primary" />
+      {/* Botões de Ação - Buscar e Criar Manualmente */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Botão Buscar Pautas - Destaque */}
+        <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-primary/10">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-primary/10">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Buscar Novas Pautas</h3>
+                  <p className="text-sm text-muted-foreground">
+                    A IA irá analisar as fontes cadastradas e sugerir novas pautas
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold">Buscar Novas Pautas</h3>
-                <p className="text-sm text-muted-foreground">
-                  A IA irá analisar as fontes cadastradas e sugerir novas pautas
-                </p>
-              </div>
+              <Button 
+                size="lg"
+                onClick={() => gerarPautas.mutate()}
+                disabled={gerarPautas.isPending}
+                className="gap-2"
+              >
+                {gerarPautas.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Buscando...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4" />
+                    Buscar Pautas
+                  </>
+                )}
+              </Button>
             </div>
-            <Button 
-              size="lg"
-              onClick={() => gerarPautas.mutate()}
-              disabled={gerarPautas.isPending}
-              className="gap-2"
-            >
-              {gerarPautas.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Buscando...
-                </>
-              ) : (
-                <>
-                  <Search className="h-4 w-4" />
-                  Buscar Pautas
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Botão Criar Manualmente */}
+        <Card className="border-secondary/50 bg-gradient-to-r from-secondary/5 to-secondary/10">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-secondary/10">
+                  <Plus className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Cadastrar Manualmente</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Adicione uma sugestão de pauta específica que você encontrou
+                  </p>
+                </div>
+              </div>
+              <Button 
+                size="lg"
+                variant="secondary"
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Nova Pauta
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="mb-4">
         <CardContent className="pt-6">
@@ -553,6 +695,152 @@ export default function Pautas() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Criação Manual */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Cadastrar Pauta Manualmente</DialogTitle>
+            <DialogDescription>
+              Preencha os dados da sugestão de pauta que você encontrou
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmitManual} className="space-y-6 mt-4">
+            {/* Assunto */}
+            <div className="space-y-2">
+              <Label htmlFor="assunto">Assunto *</Label>
+              <Input
+                id="assunto"
+                value={assunto}
+                onChange={(e) => setAssunto(e.target.value)}
+                placeholder="Ex: Tiësto anuncia nova turnê mundial"
+                required
+                disabled={createPauta.isPending}
+              />
+              <p className="text-sm text-muted-foreground">
+                Título ou assunto principal da pauta
+              </p>
+            </div>
+
+            {/* Resumo */}
+            <div className="space-y-2">
+              <Label htmlFor="resumo">Resumo *</Label>
+              <Textarea
+                id="resumo"
+                value={resumo}
+                onChange={(e) => setResumo(e.target.value)}
+                placeholder="Descreva brevemente o assunto da pauta..."
+                rows={5}
+                required
+                disabled={createPauta.isPending}
+              />
+              <p className="text-sm text-muted-foreground">
+                Resumo ou descrição detalhada da pauta
+              </p>
+            </div>
+
+            {/* Fontes */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Fontes *</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddFonte}
+                  disabled={createPauta.isPending}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar Fonte
+                </Button>
+              </div>
+              
+              <div className="space-y-3">
+                {fontes.map((fonte, index) => (
+                  <Card key={index} className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor={`fonte-nome-${index}`}>Nome da Fonte</Label>
+                          <Input
+                            id={`fonte-nome-${index}`}
+                            value={fonte.nome}
+                            onChange={(e) => handleFonteChange(index, 'nome', e.target.value)}
+                            placeholder="Ex: Mixmag Brasil"
+                            disabled={createPauta.isPending}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`fonte-url-${index}`}>URL</Label>
+                          <Input
+                            id={`fonte-url-${index}`}
+                            type="url"
+                            value={fonte.url}
+                            onChange={(e) => handleFonteChange(index, 'url', e.target.value)}
+                            placeholder="https://exemplo.com/noticia"
+                            disabled={createPauta.isPending}
+                          />
+                        </div>
+                      </div>
+                      {fontes.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveFonte(index)}
+                          disabled={createPauta.isPending}
+                          className="mt-8"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Adicione pelo menos uma fonte de referência (nome e URL)
+              </p>
+            </div>
+
+            {/* Botões */}
+            <div className="flex gap-2 pt-4 border-t">
+              <Button
+                type="submit"
+                disabled={createPauta.isPending}
+                className="flex-1"
+              >
+                {createPauta.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Criando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Criar Pauta
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsCreateDialogOpen(false);
+                  setAssunto('');
+                  setResumo('');
+                  setFontes([{ nome: '', url: '' }]);
+                }}
+                disabled={createPauta.isPending}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

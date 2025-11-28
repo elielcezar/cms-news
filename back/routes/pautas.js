@@ -36,6 +36,31 @@ router.post('/pautas', authenticateApiKey, validate(pautaCreateSchema), async (r
 });
 
 /**
+ * Criar pauta manualmente (protegido por JWT)
+ * POST /api/pautas/manual
+ */
+router.post('/pautas/manual', authenticateToken, validate(pautaCreateSchema), async (req, res, next) => {
+    try {
+        console.log('📥 Recebendo requisição POST /pautas/manual (criação manual)');
+        const { assunto, resumo, fontes } = req.body;
+
+        const pauta = await prisma.pauta.create({
+            data: {
+                assunto,
+                resumo,
+                fontes,
+            }
+        });
+
+        console.log('✅ Pauta criada manualmente com sucesso:', pauta.id);
+        res.status(201).json(pauta);
+    } catch (error) {
+        console.error('❌ Erro ao criar pauta manual:', error);
+        next(error);
+    }
+});
+
+/**
  * Disparar busca de pautas via IA (protegido por JWT)
  * POST /api/pautas/gerar
  */
