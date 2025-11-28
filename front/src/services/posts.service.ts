@@ -56,6 +56,7 @@ export const postsService = {
 
       // Adicionar campos opcionais
       if (data.status) formData.append('status', data.status);
+      if (data.idioma) formData.append('idioma', data.idioma);
       if (data.destaque !== undefined) formData.append('destaque', data.destaque.toString());
       if (data.dataPublicacao) formData.append('dataPublicacao', data.dataPublicacao);
 

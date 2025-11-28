@@ -130,7 +130,8 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
             destaque,
             dataPublicacao,
             categorias,
-            tags
+            tags,
+            idioma
         } = req.body;
 
         console.log('📝 Dados body recebidos:', {
@@ -177,15 +178,16 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
             tagId: parseInt(tagId)
         })) : [];
 
-        // Gerar URL amigável com prefixo pt/
-        let urlFinal = urlAmigavel.startsWith('pt/') ? urlAmigavel : `pt/${urlAmigavel}`;
+        // Gerar URL amigável com prefixo correto (ex: pt/, en/, es/)
+        const langPrefix = idioma || 'pt';
+        let urlFinal = urlAmigavel.startsWith(`${langPrefix}/`) ? urlAmigavel : `${langPrefix}/${urlAmigavel}`;
 
         // Verificar se já existe
         let contador = 1;
         let urlTemp = urlFinal;
         while (await prisma.postTranslation.findUnique({ where: { urlAmigavel: urlTemp } })) {
-            const baseSlug = urlAmigavel.replace('pt/', '');
-            urlTemp = `pt/${baseSlug}-${contador}`;
+            const baseSlug = urlAmigavel.replace(`${langPrefix}/`, '');
+            urlTemp = `${langPrefix}/${baseSlug}-${contador}`;
             contador++;
         }
         urlFinal = urlTemp;
@@ -196,7 +198,7 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
                 destaque: destaque === 'true' || destaque === true,
                 dataPublicacao: dataPublicacao ? new Date(dataPublicacao) : null,
                 imagens: imagens,
-                idiomaDefault: 'pt',
+                idiomaDefault: idioma || 'pt',
                 categorias: {
                     create: categoriasData
                 },
@@ -205,7 +207,7 @@ router.post('/posts', authenticateToken, handleMulterError(uploadS3.array('image
                 },
                 translations: {
                     create: {
-                        idioma: 'pt',
+                        idioma: idioma || 'pt',
                         titulo,
                         chamada,
                         conteudo,
@@ -620,6 +622,8 @@ router.get('/admin/posts/:id', authenticateToken, async (req, res, next) => {
                 translations: post.translations.map(t => ({
                     idioma: t.idioma,
                     titulo: t.titulo,
+                    chamada: t.chamada,
+                    conteudo: t.conteudo,
                     urlAmigavel: t.urlAmigavel
                 }))
             });
@@ -644,6 +648,8 @@ router.get('/admin/posts/:id', authenticateToken, async (req, res, next) => {
             translations: post.translations.map(t => ({
                 idioma: t.idioma,
                 titulo: t.titulo,
+                chamada: t.chamada,
+                conteudo: t.conteudo,
                 urlAmigavel: t.urlAmigavel
             }))
         };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { postsService } from '@/services/posts.service';
@@ -34,23 +34,31 @@ export default function PostForm() {
   const isEdit = !!id;
 
   const [currentLang, setCurrentLang] = useState<'pt' | 'en' | 'es'>('pt');
-  const [formData, setFormData] = useState<PostFormData>({
-    titulo: '',
-    chamada: '',
-    conteudo: '',
-    urlAmigavel: '',
-    status: 'RASCUNHO',
+  const initialRedirectDone = useRef(false);
+
+  // Estado separado por idioma
+  const [translationsData, setTranslationsData] = useState<{
+    pt: { titulo: string; chamada: string; conteudo: string; urlAmigavel: string };
+    en: { titulo: string; chamada: string; conteudo: string; urlAmigavel: string };
+    es: { titulo: string; chamada: string; conteudo: string; urlAmigavel: string };
+  }>({
+    pt: { titulo: '', chamada: '', conteudo: '', urlAmigavel: '' },
+    en: { titulo: '', chamada: '', conteudo: '', urlAmigavel: '' },
+    es: { titulo: '', chamada: '', conteudo: '', urlAmigavel: '' },
+  });
+
+  // Dados comuns (compartilhados entre idiomas)
+  const [commonData, setCommonData] = useState({
+    status: 'RASCUNHO' as 'RASCUNHO' | 'PUBLICADO',
     destaque: false,
-    dataPublicacao: new Date().toISOString().slice(0, 16), // Data atual no formato datetime-local
-    categorias: [],
-    tags: [],
-    imagens: [],
-    oldImages: [],
+    dataPublicacao: new Date().toISOString().slice(0, 16),
+    imagens: [] as File[],
+    oldImages: [] as string[],
   });
 
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [selectedCategorias, setSelectedCategorias] = useState<number[]>([]);
-  const [tagNames, setTagNames] = useState<string[]>([]); // Mudado para nomes de tags
+  const [tagNames, setTagNames] = useState<string[]>([]);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>(['pt']);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const [isGeneratingTranslations, setIsGeneratingTranslations] = useState(false);
@@ -75,21 +83,24 @@ export default function PostForm() {
   });
 
   // Buscar post se for edição (com idioma atual)
+  // Buscar post se for edição (carrega TODAS as traduções de uma vez)
   const { data: post, refetch: refetchPost } = useQuery({
-    queryKey: ['post', id, currentLang],
-    queryFn: () => postsService.getById(Number(id), currentLang),
+    queryKey: ['post', id],
+    queryFn: () => postsService.getById(Number(id)),
     enabled: isEdit && !!id,
   });
 
-  // Recarregar tradução ao trocar idioma
-  useEffect(() => {
-    if (isEdit && id) {
-      refetchPost();
-    }
-  }, [currentLang, isEdit, id, refetchPost]);
+  // useEffect de refetch removido pois não é mais necessário recarregar ao trocar idioma
 
   useEffect(() => {
     if (post && isEdit) {
+      console.log('📦 Post carregado:', {
+        id: post.id,
+        idiomaDefault: post.idiomaDefault,
+        translations: post.translations,
+        titulo: post.titulo
+      });
+
       const categoriasIds = post.categorias?.map(c => c.categoria.id) || [];
       // Converter IDs de tags para nomes
       const tagNamesFromPost = post.tags?.map(t => {
@@ -104,8 +115,50 @@ export default function PostForm() {
       }).filter(Boolean) || [];
 
       // Idiomas disponíveis (traduções existentes)
-      const langs = post.translations?.map(t => t.idioma) || ['pt'];
-      setAvailableLanguages(langs);
+      const langs = post.translations?.map(t => t.idioma) || post.translationsAvailable || [];
+      // Se não houver traduções listadas, assume-se o idioma padrão do post
+      const availableLangs = langs.length > 0 ? langs : [post.idiomaDefault || 'pt'];
+
+      setAvailableLanguages(availableLangs);
+
+      // IMPORTANTE: Primeiro, processar TODAS as traduções disponíveis
+      // Isso garante que os dados estejam prontos independente do idioma selecionado
+      setTranslationsData(prev => {
+        const newData = { ...prev };
+
+        // Preencher dados de cada tradução disponível
+        if (post.translations && post.translations.length > 0) {
+          console.log('🔄 Processando traduções:', post.translations);
+          post.translations.forEach(t => {
+            console.log(`  ➡️ Tradução [${t.idioma}]:`, t);
+            if (t.idioma === 'pt' || t.idioma === 'en' || t.idioma === 'es') {
+              newData[t.idioma] = {
+                titulo: t.titulo || '',
+                chamada: t.chamada || '',
+                conteudo: t.conteudo || '',
+                urlAmigavel: t.urlAmigavel || '',
+              };
+            }
+          });
+        }
+
+        return newData;
+      });
+
+      // Se o idioma atual não está entre os disponíveis, mudar para o primeiro disponível
+      // Isso evita mostrar aba vazia quando o post foi criado em outro idioma
+      // MAS apenas na primeira carga, para permitir que o usuário mude de aba para criar tradução
+      if (!initialRedirectDone.current && langs.length > 0 && !langs.includes(currentLang)) {
+        // Preferir o idioma padrão do post, senão usar o primeiro disponível
+        const targetLang = (post.idiomaDefault && langs.includes(post.idiomaDefault)) 
+          ? post.idiomaDefault as 'pt' | 'en' | 'es'
+          : langs[0] as 'pt' | 'en' | 'es';
+        console.log(`🔄 Redirecionando para idioma: ${targetLang} (idiomaDefault: ${post.idiomaDefault})`);
+        setCurrentLang(targetLang);
+      }
+      
+      // Marcar como feito após primeira carga
+      initialRedirectDone.current = true;
 
       // Converter data para formato datetime-local (YYYY-MM-DDTHH:mm)
       let dataFormatada = '';
@@ -114,19 +167,15 @@ export default function PostForm() {
         dataFormatada = date.toISOString().slice(0, 16); // Remove segundos e timezone
       }
 
-      setFormData({
-        titulo: post.titulo || '',
-        chamada: post.chamada || '',
-        conteudo: post.conteudo || '',
-        urlAmigavel: post.urlAmigavel || '',
+      // Atualizar dados comuns
+      setCommonData({
         status: post.status,
         destaque: post.destaque,
         dataPublicacao: dataFormatada,
-        categorias: categoriasIds,
-        tags: [], // Não usar mais IDs aqui
         imagens: [],
         oldImages: post.imagens || [],
       });
+
       setPreviewImages(post.imagens || []);
       setSelectedCategorias(categoriasIds);
       setTagNames(tagNamesFromPost);
@@ -137,17 +186,27 @@ export default function PostForm() {
   useEffect(() => {
     const pautaData = location.state?.fromPauta;
     if (pautaData && !isEdit) {
-      setFormData(prev => ({
+      setTranslationsData(prev => ({
         ...prev,
-        titulo: pautaData.titulo || '',
-        chamada: pautaData.chamada || '',
-        conteudo: pautaData.conteudo || '',
+        [currentLang]: {
+          ...prev[currentLang],
+          titulo: pautaData.titulo || '',
+          chamada: pautaData.chamada || '',
+          conteudo: pautaData.conteudo || '',
+        }
       }));
 
       // Auto-gerar slug do título
       if (pautaData.titulo) {
         const slug = generateSlug(pautaData.titulo);
-        setFormData(prev => ({ ...prev, urlAmigavel: slug }));
+        const slugWithLang = `${currentLang}/${slug}`;
+        setTranslationsData(prev => ({
+          ...prev,
+          [currentLang]: {
+            ...prev[currentLang],
+            urlAmigavel: slugWithLang
+          }
+        }));
       }
 
       // Selecionar site se fornecido
@@ -205,58 +264,127 @@ export default function PostForm() {
     },
   });
 
+  // Atualizar campo de idioma específico
+  const updateTranslation = (
+    lang: 'pt' | 'en' | 'es',
+    field: 'titulo' | 'chamada' | 'conteudo' | 'urlAmigavel',
+    value: string
+  ) => {
+    setTranslationsData(prev => ({
+      ...prev,
+      [lang]: {
+        ...prev[lang],
+        [field]: value
+      }
+    }));
+  };
+
+  // Verificar se um idioma tem conteúdo
+  const hasContent = (lang: 'pt' | 'en' | 'es') => {
+    const data = translationsData[lang];
+    return !!(data.titulo && data.chamada && data.conteudo);
+  };
+
+  // Obter idiomas preenchidos
+  const getFilledLanguages = (): ('pt' | 'en' | 'es')[] => {
+    return (['pt', 'en', 'es'] as const).filter(lang => hasContent(lang));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    try {
-      // Converter nomes de tags para IDs (criando tags novas se necessário)
-      const tagIds = await tagsService.resolveTagIds(tagNames);
-
-      const dataToSubmit = {
-        ...formData,
-        categorias: selectedCategorias || [], // Sempre enviar array, mesmo se vazio
-        tags: tagIds || [], // Sempre enviar array, mesmo se vazio
-        oldImages: formData.oldImages || [], // Sempre enviar array, mesmo se vazio (permite remover imagens)
-      };
-
-      console.log('📤 Enviando formulário com dados:', dataToSubmit);
-
-      if (isEdit) {
-        updateMutation.mutate(dataToSubmit);
-      } else {
-        createMutation.mutate(dataToSubmit);
-      }
-    } catch (error) {
+    // Validar que pelo menos 1 idioma foi preenchido
+    const filledLangs = getFilledLanguages();
+    if (filledLangs.length === 0) {
       toast({
         variant: 'destructive',
-        title: 'Erro ao processar tags',
-        description: error instanceof Error ? error.message : 'Não foi possível processar as tags.',
+        title: 'Nenhum idioma preenchido',
+        description: 'Preencha pelo menos um idioma antes de salvar.',
       });
+      return;
+    }
+
+    try {
+      const tagIds = await tagsService.resolveTagIds(tagNames);
+
+      if (isEdit) {
+        // Modo edição: salvar apenas o idioma atual
+        const dataToSubmit = {
+          ...translationsData[currentLang],
+          ...commonData,
+          categorias: selectedCategorias || [],
+          tags: tagIds || [],
+        };
+        updateMutation.mutate(dataToSubmit);
+      } else {
+        // Modo criação: criar post com primeira tradução
+        const primaryLang = filledLangs[0];
+
+        const dataToSubmit = {
+          ...translationsData[primaryLang],
+          ...commonData,
+          categorias: selectedCategorias || [],
+          tags: tagIds || [],
+          idioma: primaryLang,
+        };
+
+        // Criar post
+        const createdPost = await createMutation.mutateAsync(dataToSubmit);
+
+        // Se há outros idiomas preenchidos, salvá-los também
+        if (filledLangs.length > 1) {
+          for (const lang of filledLangs.slice(1)) {
+            await postsService.update(
+              createdPost.id,
+              {
+                titulo: translationsData[lang].titulo,
+                chamada: translationsData[lang].chamada,
+                conteudo: translationsData[lang].conteudo,
+                urlAmigavel: translationsData[lang].urlAmigavel,
+                categorias: selectedCategorias,
+                tags: tagIds,
+              },
+              lang
+            );
+          }
+        }
+
+        toast({
+          title: 'Post criado com sucesso!',
+          description: `Post criado com ${filledLangs.length} idioma(s): ${filledLangs.map(l => l.toUpperCase()).join(', ')}`,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao salvar post:', error);
     }
   };
 
-  const handleChange = (field: keyof PostFormData, value: string | boolean | number | File[] | string[]) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+
+  const handleChange = (field: keyof typeof commonData, value: any) => {
+    setCommonData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
-  // Gerar slug automaticamente do título
   const generateSlug = (text: string) => {
     return text
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-      .replace(/[^a-z0-9\s-]/g, '') // Remove caracteres especiais
-      .replace(/\s+/g, '-') // Substitui espaços por hífens
-      .replace(/-+/g, '-') // Remove hífens duplicados
-      .replace(/^-|-$/g, ''); // Remove hífens do início e fim
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^\w\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .trim();
   };
 
-  const handleTituloChange = (value: string) => {
-    handleChange('titulo', value);
-    // Auto-gerar slug se estiver vazio ou for novo post
-    if (!isEdit || !formData.urlAmigavel) {
-      handleChange('urlAmigavel', generateSlug(value));
-    }
+  const handleTituloChange = (novoTitulo: string) => {
+    updateTranslation(currentLang, 'titulo', novoTitulo);
+    // Sempre atualizar slug (criação e edição)
+    const slug = generateSlug(novoTitulo);
+    // Adiciona o prefixo do idioma (ex: pt/titulo-do-post)
+    const slugWithLang = `${currentLang}/${slug}`;
+    updateTranslation(currentLang, 'urlAmigavel', slugWithLang);
   };
 
   // Handler para upload de imagem de capa
@@ -292,7 +420,7 @@ export default function PostForm() {
 
     // Substituir imagem (apenas 1)
     // Limpar oldImages para que o backend substitua todas as imagens antigas pela nova
-    setFormData(prev => ({
+    setCommonData(prev => ({
       ...prev,
       imagens: [file],
       oldImages: [], // Array vazio indica que queremos substituir todas as imagens antigas
@@ -310,7 +438,7 @@ export default function PostForm() {
 
   // Remover imagem de capa
   const handleRemoveImage = () => {
-    setFormData(prev => ({
+    setCommonData(prev => ({
       ...prev,
       imagens: [],
       oldImages: [],
@@ -343,7 +471,8 @@ export default function PostForm() {
     }
 
     // Validar se há conteúdo suficiente
-    if (!formData.titulo || !formData.chamada || !formData.conteudo) {
+    const currentData = translationsData[currentLang];
+    if (!currentData.titulo || !currentData.chamada || !currentData.conteudo) {
       toast({
         variant: 'destructive',
         title: 'Campos obrigatórios faltando',
@@ -363,9 +492,9 @@ export default function PostForm() {
       // Chamar API para gerar traduções
       const response = await postsService.generateTranslations(Number(id), {
         idiomaOriginal: currentLang,
-        titulo: formData.titulo,
-        chamada: formData.chamada,
-        conteudo: formData.conteudo,
+        titulo: currentData.titulo,
+        chamada: currentData.chamada,
+        conteudo: currentData.conteudo,
       });
 
       if (!response.success || !response.translations) {
@@ -433,48 +562,47 @@ export default function PostForm() {
         </div>
       </div>
 
-      {/* Seletor de Idioma */}
-      {isEdit && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Globe className="h-5 w-5 text-muted-foreground" />
-              <Label className="text-base font-semibold">Idioma da Edição:</Label>
-              <Tabs value={currentLang} onValueChange={(val) => setCurrentLang(val as 'pt' | 'en' | 'es')}>
-                <TabsList>
-                  <TabsTrigger value="pt" className="gap-2">
-                    🇧🇷 PT
-                    {availableLanguages.includes('pt') && <Badge variant="secondary" className="text-xs">✓</Badge>}
-                  </TabsTrigger>
-                  <TabsTrigger value="en" className="gap-2">
-                    🇺🇸 EN
-                    {availableLanguages.includes('en') && <Badge variant="secondary" className="text-xs">✓</Badge>}
-                  </TabsTrigger>
-                  <TabsTrigger value="es" className="gap-2">
-                    🇪🇸 ES
-                    {availableLanguages.includes('es') && <Badge variant="secondary" className="text-xs">✓</Badge>}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              {!availableLanguages.includes(currentLang) && (
-                <Badge variant="destructive">Nova Tradução</Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Seletor de Idioma - Sempre visível */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3">
+            <Globe className="h-5 w-5 text-muted-foreground" />
+            <Label className="text-base font-semibold">Idioma da Edição:</Label>
+            <Tabs value={currentLang} onValueChange={(val) => setCurrentLang(val as 'pt' | 'en' | 'es')}>
+              <TabsList>
+                <TabsTrigger value="pt" className="gap-2">
+                  🇧🇷 PT
+                  {hasContent('pt') && <Badge variant="secondary" className="text-xs">✓</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="en" className="gap-2">
+                  🇺🇸 EN
+                  {hasContent('en') && <Badge variant="secondary" className="text-xs">✓</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="es" className="gap-2">
+                  🇪🇸 ES
+                  {hasContent('es') && <Badge variant="secondary" className="text-xs">✓</Badge>}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {!isEdit && !hasContent(currentLang) && (
+              <Badge variant="outline">Vazio</Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
 
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle>Informações do Post {isEdit && `(${currentLang.toUpperCase()})`}</CardTitle>
+            <CardTitle>Informações do Post ({currentLang.toUpperCase()})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="titulo">Título *</Label>
               <Input
                 id="titulo"
-                value={formData.titulo}
+                value={translationsData[currentLang].titulo}
                 onChange={(e) => handleTituloChange(e.target.value)}
                 required
                 disabled={isLoading}
@@ -486,8 +614,8 @@ export default function PostForm() {
               <Label htmlFor="urlAmigavel">URL Amigável *</Label>
               <Input
                 id="urlAmigavel"
-                value={formData.urlAmigavel}
-                onChange={(e) => handleChange('urlAmigavel', e.target.value)}
+                value={translationsData[currentLang].urlAmigavel}
+                onChange={(e) => updateTranslation(currentLang, 'urlAmigavel', e.target.value)}
                 required
                 disabled={isLoading}
                 placeholder={isEdit ? `${currentLang}/titulo-do-post` : "titulo-do-post"}
@@ -506,8 +634,8 @@ export default function PostForm() {
               <Label htmlFor="chamada">Chamada *</Label>
               <Textarea
                 id="chamada"
-                value={formData.chamada}
-                onChange={(e) => handleChange('chamada', e.target.value)}
+                value={translationsData[currentLang].chamada}
+                onChange={(e) => updateTranslation(currentLang, 'chamada', e.target.value)}
                 required
                 disabled={isLoading}
                 rows={3}
@@ -571,8 +699,8 @@ export default function PostForm() {
             <div className="space-y-2">
               <Label htmlFor="conteudo">Conteúdo *</Label>
               <RichTextEditor
-                content={formData.conteudo}
-                onChange={(html) => handleChange('conteudo', html)}
+                content={translationsData[currentLang].conteudo}
+                onChange={(html) => updateTranslation(currentLang, 'conteudo', html)}
                 className={isLoading ? 'opacity-50 pointer-events-none' : ''}
               />
               <p className="text-sm text-muted-foreground">
@@ -584,7 +712,7 @@ export default function PostForm() {
               <div className="space-y-2">
                 <Label htmlFor="status">Status *</Label>
                 <Select
-                  value={formData.status}
+                  value={commonData.status}
                   onValueChange={(value: 'RASCUNHO' | 'PUBLICADO') => handleChange('status', value)}
                   disabled={isLoading}
                 >
@@ -603,7 +731,7 @@ export default function PostForm() {
                 <Input
                   id="dataPublicacao"
                   type="datetime-local"
-                  value={formData.dataPublicacao}
+                  value={commonData.dataPublicacao}
                   onChange={(e) => handleChange('dataPublicacao', e.target.value)}
                   disabled={isLoading}
                 />
@@ -614,7 +742,7 @@ export default function PostForm() {
                 <div className="flex items-center space-x-2 pt-2">
                   <Checkbox
                     id="destaque"
-                    checked={formData.destaque}
+                    checked={commonData.destaque}
                     onCheckedChange={(checked) => handleChange('destaque', checked)}
                     disabled={isLoading}
                   />
