@@ -142,7 +142,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
 
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5',
       messages: [
         {
           role: 'system',
@@ -722,7 +722,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
 
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5',
       messages: [
         {
           role: 'system',
