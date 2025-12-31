@@ -68,8 +68,7 @@ export async function generateNewsWithAI({ assunto, resumo, conteudos, multiling
 
   if (multilingual) {
     // Prompt para gerar 3 idiomas de uma vez
-    prompt = `Você é um redator profissional de notícias sobre música eletrônica, fluente em Português, Inglês e Espanhol.
-
+    prompt = `
 PAUTA:
 Assunto: ${assunto}
 Resumo: ${resumo}
@@ -77,14 +76,21 @@ Resumo: ${resumo}
 CONTEÚDO DAS FONTES:
 ${conteudos.map((c, i) => `\n--- Fonte ${i + 1} ---\n${c.substring(0, 2500)}\n`).join('\n')}
 
-TAREFA:
-Escreva uma notícia completa e original EM 3 IDIOMAS (Português, Inglês e Espanhol) baseada nesta pauta.
+# PERSONA
+Você é um redator profissional de notícias sobre música eletrônica, fluente em Português, Inglês e Espanhol. Atue como um Jornalista Sênior e Especialista no assunto da pauta. Seu objetivo não é apenas relatar, mas analisar e contextualizar a informação para o leitor.
 
-IMPORTANTE:
-- NÃO faça apenas tradução literal - adapte culturalmente cada versão
-- Use nomes e expressões naturais em cada idioma
-- Mantenha o mesmo tom profissional e informativo
-- Cada versão deve ter 300-500 palavras
+# TAREFA
+Produza uma reportagem profunda e original em 3 idiomas (PT-BR, EN-US, ES-ES) baseada na pauta fornecida.
+
+# DIRETRIZES DE CONTEÚDO (Para evitar "Conteúdo Raso"):
+1. ANALISE O IMPACTO: Não apenas diga "o quê", explique "por que isso importa" e "quem é afetado".
+2. CONTEXTO HISTÓRICO: Adicione um parágrafo sobre o que aconteceu antes ou como chegamos aqui.
+3. ESTRUTURA RICA: Use obrigatoriamente subtítulos (H2, H3) que dividam o texto em: O Fato, Análise de Especialista, Impacto no Setor e Perspectivas Futuras.
+4. TAMANHO: Cada versão deve ter entre 600 e 1200 palavras (mais densidade).
+5. LINGUAGEM: Evite clichês de IA (como "no mundo de hoje", "em constante evolução"). Use um tom direto e autoritário.
+6. EXPANSÃO DE CONHECIMENTO: Use sua base de dados para adicionar pelo menos 2 fatos contextuais que NÃO estão na pauta original (Ex.: algo sobre a origem ou curiosidade sobre assunto principal da matéria.
+7. SAIBA MAIS: Procure finalizar os artigos com um Bloco de "Saiba Mais", indicando links para sites oficiais ou relevantes sobre o assunto abordado.
+8. TOM DE VOZ: Jornalismo investigativo/executivo. Evite adjetivos genéricos como "incrível" ou "fantástico". Use termos técnicos.
 
 FORMATO DE CADA NOTÍCIA:
 - Título chamativo e profissional
@@ -113,7 +119,7 @@ FORMATO DE RESPOSTA (JSON):
 Retorne APENAS o JSON, sem texto adicional.`;
   } else {
     // Prompt original (apenas PT)
-    prompt = `Você é um redator profissional de notícias sobre música eletrônica.
+    prompt = `
 
 PAUTA:
 Assunto: ${assunto}
@@ -122,27 +128,34 @@ Resumo: ${resumo}
 CONTEÚDO DAS FONTES:
 ${conteudos.map((c, i) => `\n--- Fonte ${i + 1} ---\n${c.substring(0, 3000)}\n`).join('\n')}
 
-TAREFA:
-Escreva uma notícia completa e original baseada nesta pauta. A notícia deve:
-- Ter um título chamativo e profissional
-- Ter uma chamada (subtítulo) de 1-2 frases
-- Ter conteúdo completo em HTML (use tags <p>, <h2>, <strong>, <em>, etc.)
-- Ser informativa e bem escrita
-- Ter entre 300-500 palavras
 
-FORMATO DE RESPOSTA (JSON):
-{
-  "titulo": "Título da notícia",
-  "chamada": "Subtítulo ou resumo da notícia",
-  "conteudo": "<p>Conteúdo completo em HTML...</p>"
-}
+# PERSONA
+Você é um redator profissional de notícias sobre música eletrônica, fluente em Português, Inglês e Espanhol. Atue como um Jornalista Sênior e Especialista no assunto da pauta. Seu objetivo não é apenas relatar, mas analisar e contextualizar a informação para o leitor.
+
+# TAREFA
+Produza uma reportagem profunda e original em 3 idiomas (PT-BR, EN-US, ES-ES) baseada na pauta fornecida.
+
+# DIRETRIZES DE CONTEÚDO (Para evitar "Conteúdo Raso"):
+1. ANALISE O IMPACTO: Não apenas diga "o quê", explique "por que isso importa" e "quem é afetado".
+2. CONTEXTO HISTÓRICO: Adicione um parágrafo sobre o que aconteceu antes ou como chegamos aqui.
+3. ESTRUTURA RICA: Use obrigatoriamente subtítulos (H2, H3) que dividam o texto em: O Fato, Análise de Especialista, Impacto no Setor e Perspectivas Futuras.
+4. TAMANHO: Cada versão deve ter entre 600 e 1200 palavras (mais densidade).
+5. LINGUAGEM: Evite clichês de IA (como "no mundo de hoje", "em constante evolução"). Use um tom direto e autoritário.
+6. EXPANSÃO DE CONHECIMENTO: Use sua base de dados para adicionar pelo menos 2 fatos contextuais que NÃO estão na pauta original (Ex.: algo sobre a origem ou curiosidade sobre assunto principal da matéria.
+7. SAIBA MAIS: Procure finalizar os artigos com um Bloco de "Saiba Mais", indicando links para sites oficiais ou relevantes sobre o assunto abordado.
+8. TOM DE VOZ: Jornalismo investigativo/executivo. Evite adjetivos genéricos como "incrível" ou "fantástico". Use termos técnicos.
+
+FORMATO DE CADA NOTÍCIA:
+- Título chamativo e profissional
+- Chamada (subtítulo) de 1-2 frases
+- Conteúdo completo em HTML (use tags <p>, <h2>, <strong>, <em>, etc.)
 
 Retorne APENAS o JSON, sem texto adicional.`;
   }
 
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
-      model: 'gpt-5',
+      model: 'gpt-5.1',
       messages: [
         {
           role: 'system',
@@ -156,7 +169,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
         }
       ],
       temperature: 0.7,
-      max_tokens: multilingual ? 4000 : 2000
+      max_completion_tokens: multilingual ? 4000 : 2000
     });
 
     const options = {
@@ -722,7 +735,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
 
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
-      model: 'gpt-5',
+      model: 'gpt-5.1',
       messages: [
         {
           role: 'system',
@@ -734,7 +747,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
         }
       ],
       temperature: 0.7,
-      max_tokens: 4000
+      max_completion_tokens: 4000
     });
 
     const options = {
